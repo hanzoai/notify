@@ -3,6 +3,7 @@ package line
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/utahta/go-linenotify"
 )
@@ -22,6 +23,10 @@ func NewNotify() *Notify {
 		client: c,
 	}
 	return l
+}
+
+func (ln *Notify) SetHttpClient(client *http.Client) {
+	ln.client.HTTPClient = client
 }
 
 // AddReceivers receives token then add them to internal receivers list.
