@@ -1,34 +1,34 @@
-name: Go-test
-on: [push, pull_request]
+name: Go
+
+on:
+  - push
+  - pull_request
 
 jobs:
-  build:
+
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Go
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: stable
-      - name: Build
-        run: go build -v ./...
-      - name: Test with the Go CLI
-        run: go test ./...
-      - name: Test coverage
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+          go-version: 1.24
 
-  golangci:
-    name: lint
+      - uses: actions/checkout@v4
+      - name: Run Unit tests
+        run: go test -v ./...
+
+  semantic-release:
+    needs: [ test ]
     runs-on: ubuntu-latest
     steps:
+
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: stable
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.61
+      - name: Run semantic-release
+        if: github.repository == 'casdoor/notify' && github.event_name == 'push'
+        run: |
+          npm install --save-dev semantic-release@17.2.4
+          npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
