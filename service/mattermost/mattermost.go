@@ -8,8 +8,6 @@ import (
 	"io"
 	stdhttp "net/http"
 
-	"github.com/pkg/errors"
-
 	"github.com/casdoor/notify2/service/http"
 )
 
