@@ -30,7 +30,18 @@ RUN groupadd -g 65532 nonroot && \
 
 # Cache the module graph first.
 COPY go.mod go.sum ./
-RUN go mod download
+# github_token build secret: hanzoai/cloud (and other hanzoai/*) are
+# private — `go mod download` needs auth. BuildKit mounts the secret as
+# a tmpfs file scoped to this RUN only; it doesn't end up in any layer.
+# CI passes the token via `--secret id=github_token,env=GH_TOKEN` (using
+# the workflow's GITHUB_TOKEN); local builds use a hanzo-dev PAT the
+# same way.
+RUN --mount=type=secret,id=github_token,target=/run/secrets/gh_token,required=true \
+    git config --global \
+      url."https://x-access-token:$(cat /run/secrets/gh_token)@github.com/".insteadOf \
+      "https://github.com/" && \
+    go mod download && \
+    git config --global --unset url."https://x-access-token:$(cat /run/secrets/gh_token)@github.com/".insteadOf
 
 COPY . .
 
