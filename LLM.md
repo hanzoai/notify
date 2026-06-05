@@ -211,6 +211,31 @@ never returns them.
 - **Admin auth**: `NOTIFY_ADMIN_KEY` Bearer; empty env →
   fail-closed 401 on every admin route.
 
+## Storage — SQLite-only (lockdown)
+
+notifyd uses `hanzoai/base` exclusively (per-(org, user) SQLite under
+`--dir`). There is no Postgres code path at the source level: `pgx` only
+appears as a transitive indirect in `go.mod`.
+
+Per the Hanzo PG → SQLite migration plan
+(~/work/hanzo/CLAUDE_PG_TO_SQLITE_MIGRATION.md, service #2 — notify),
+notifyd ships with a `internal/storagelock` package that scans the
+process env at boot and refuses to start if any of these are set:
+
+```
+DATABASE_URL, POSTGRES_URL, POSTGRES_DSN, POSTGRES_HOST,
+NOTIFY_DATABASE_URL, NOTIFY_POSTGRES_URL
+```
+
+This is the canonical anti-regression: notify cannot be re-pinned to
+Postgres by env-var override in a deployment manifest. The check is
+wired in `cmd/notifyd/main.go` before `base.New()`; covered by
+`internal/storagelock/storagelock_test.go` (9 cases including DSN
+parse, redaction, and whitespace trimming).
+
+There is no migration CLI for notify because there is no Postgres
+schema to migrate from — the lockdown IS the deliverable.
+
 ## Schema invariants
 
 - One Message row per recipient; multi-recipient `to` fans out.
