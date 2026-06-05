@@ -22,12 +22,21 @@ import (
 	"github.com/hanzoai/notify/internal/marketing"
 	"github.com/hanzoai/notify/internal/routes"
 	"github.com/hanzoai/notify/internal/schema"
+	"github.com/hanzoai/notify/internal/storagelock"
 	"github.com/hanzoai/notify/internal/tasks"
 	"github.com/hanzoai/notify/internal/tenant"
 	"github.com/hanzoai/notify/internal/unsubscribe"
 )
 
 func main() {
+	// Storage lockdown: notifyd is SQLite-only (via hanzoai/base). Any
+	// Postgres env-var override is a deployment bug — crash early so it
+	// is loud. See ~/work/hanzo/CLAUDE_PG_TO_SQLITE_MIGRATION.md (#2 —
+	// notify) for the policy.
+	if err := storagelock.CheckEnv(os.Getenv); err != nil {
+		log.Fatalf("notifyd: %v", err)
+	}
+
 	app := base.New()
 
 	// Platform plugin: IAM JWT validation, X-Org-Id injection, KMS
