@@ -161,7 +161,6 @@ type Tenant struct {
 
 // Template is a re-usable message body keyed by tenant + canonical id.
 // Lifecycle: draft → pending_approval → approved → published → archived.
-// Lifted from the BD just-shipped design (liquidityio/bd#105).
 type Template struct {
 	ID         string   `json:"id"`
 	TenantSlug string   `json:"tenant_slug"`

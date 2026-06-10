@@ -25,12 +25,12 @@ func TestAmazonSES_SendRaw_EnvelopeShape(t *testing.T) {
 
 	now := time.Date(2026, 6, 3, 12, 0, 0, 0, time.UTC)
 	s := &AmazonSES{
-		senderAddress:     aws.String("hello@notify.satschel.com"),
+		senderAddress:     aws.String("hello@notify.hanzo.ai"),
 		receiverAddresses: []string{"recipient@example.com"},
 	}
 
 	headers := map[string]string{
-		"List-Unsubscribe":      "<https://notify.dev.satschel.com/v1/notify/unsubscribe/TOKEN>, <mailto:unsubscribe+TOKEN@notify.satschel.com>",
+		"List-Unsubscribe":      "<https://notify.dev.hanzo.ai/v1/notify/unsubscribe/TOKEN>, <mailto:unsubscribe+TOKEN@notify.hanzo.ai>",
 		"List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
 	}
 
@@ -43,13 +43,13 @@ func TestAmazonSES_SendRaw_EnvelopeShape(t *testing.T) {
 	// against the first line ending, so we scan from a moving offset
 	// and require each subsequent header to appear AFTER the previous.
 	want := []string{
-		"From: hello@notify.satschel.com\r\n",
+		"From: hello@notify.hanzo.ai\r\n",
 		"To: recipient@example.com\r\n",
 		"Subject: Hello there\r\n",
 		"Date: Wed, 03 Jun 2026 12:00:00 +0000\r\n",
 		"MIME-Version: 1.0\r\n",
 		"Content-Type: text/html; charset=UTF-8\r\n",
-		"List-Unsubscribe: <https://notify.dev.satschel.com/v1/notify/unsubscribe/TOKEN>, <mailto:unsubscribe+TOKEN@notify.satschel.com>\r\n",
+		"List-Unsubscribe: <https://notify.dev.hanzo.ai/v1/notify/unsubscribe/TOKEN>, <mailto:unsubscribe+TOKEN@notify.hanzo.ai>\r\n",
 		"List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n",
 	}
 	cursor := 0

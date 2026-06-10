@@ -46,8 +46,8 @@ func TestRunMarketing_PrefersSendRaw(t *testing.T) {
 	p := &fakeRawProvider{id: "ses_api"}
 	chain := &ProviderChain{
 		Channel:   ChainEmailMarketing,
-		Tenant:    "liquidity",
-		Brand:     "liquidity",
+		Tenant:    "acme",
+		Brand:     "acme",
 		Providers: []ChainProvider{p},
 	}
 	headers := map[string]string{

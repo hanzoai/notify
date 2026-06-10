@@ -120,7 +120,7 @@ func ensureTenants(app core.App) error {
 		return nil
 	}
 	c := core.NewBaseCollection(Tenants)
-	// Tenant IDs are IAM org slugs (e.g. "hanzo", "liquidity") — the
+	// Tenant IDs are IAM org slugs (e.g. "hanzo", "lux", "zoo") — the
 	// default base 15-char min doesn't fit. Override the system id field.
 	c.Fields.Add(&core.TextField{
 		Name:       "id",
@@ -351,8 +351,8 @@ func ensurePreferences(app core.App) error {
 }
 
 // ensureConsentLog creates the append-only audit trail. FINRA Rule
-// 2210(d)(2) retention: 5 years; that retention is handled by the
-// LiquidReplicate sidecar streaming the SQLite WAL to S3, not by this
+// 2210(d)(2) retention: 5 years; that retention is handled by a
+// replicator sidecar streaming the SQLite WAL to S3, not by this
 // schema.
 func ensureConsentLog(app core.App) error {
 	if existing, _ := app.FindCollectionByNameOrId(ConsentLog); existing != nil {

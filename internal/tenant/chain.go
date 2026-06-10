@@ -39,7 +39,7 @@ package tenant
 //   brand/<slug>/sendgrid/{api-key, from-address, from-name}
 //
 // Same brand-fallback rule as PlivoResolver: missing brand secrets
-// fall through to brand/liquidity/<provider>/* (the fleet default).
+// fall through to brand/<DefaultBrand>/<provider>/* (the fleet default).
 
 import (
 	"context"
@@ -443,7 +443,7 @@ func classifyError(err error) errClass {
 // ChainResolver constructs ProviderChain instances for a (brand,
 // channel) pair. It owns the KMS bridge — every constructed provider
 // reads its secrets via the same fall-back path as PlivoResolver
-// (brand/<slug>/<provider>/* → brand/liquidity/<provider>/* on miss).
+// (brand/<slug>/<provider>/* → brand/<DefaultBrand>/<provider>/* on miss).
 type ChainResolver struct {
 	kms *kmsbridge.Client
 
@@ -469,9 +469,9 @@ func NewChainResolver(kms *kmsbridge.Client) (*ChainResolver, error) {
 // The order comes from KMS at brand/<slug>/notify-chain/<channel> as a
 // JSON array of provider ids; absent → DefaultChainFor(channel). For
 // each provider id in order, the resolver builds the provider with the
-// brand's KMS secrets (falling back to brand/liquidity/<provider>/* on
-// any missing secret), skipping providers the brand has not configured
-// (and the Liquidity default has not configured either).
+// brand's KMS secrets (falling back to brand/<DefaultBrand>/<provider>/*
+// on any missing secret), skipping providers the brand has not configured
+// (and the default brand has not configured either).
 //
 // The resolver returns ErrNoProviders if every provider in the resolved
 // order failed to construct.
@@ -502,7 +502,7 @@ func (r *ChainResolver) Resolve(ctx context.Context, brand string, channel Chain
 		}
 		if brandUsed != brand && chain.Brand == brand {
 			// Record the fact that at least one provider fell back to
-			// the Liquidity default. Useful for telemetry but does not
+			// the default brand. Useful for telemetry but does not
 			// override the chain's nominal brand.
 			_ = brandUsed
 		}
@@ -557,7 +557,7 @@ func (r *ChainResolver) fetchOrder(brand string, channel ChainChannel) []string 
 	path := providerChainKMSPath + "/" + string(channel)
 	raw, err := r.kms.GetSecret(brand, "brand/"+brand+"/"+path)
 	if err != nil || strings.TrimSpace(raw) == "" {
-		// Try the Liquidity default's override before falling back to
+		// Try the default brand's override before falling back to
 		// the hard-coded default chain.
 		if brand != DefaultBrand {
 			raw, err = r.kms.GetSecret(DefaultBrand, "brand/"+DefaultBrand+"/"+path)
@@ -598,7 +598,7 @@ func knownProvider(id string) bool {
 }
 
 // buildProvider constructs a ChainProvider for (brand, providerID),
-// resolving credentials via the brand → Liquidity-default fallback.
+// resolving credentials via the brand → default fallback.
 // The brand whose secrets were used is returned for telemetry.
 func (r *ChainResolver) buildProvider(ctx context.Context, brand, providerID string) (ChainProvider, string, error) {
 	switch providerID {
@@ -618,9 +618,9 @@ func (r *ChainResolver) buildProvider(ctx context.Context, brand, providerID str
 
 // readBrandSecret implements the brand→default fallback for a single
 // secret field. Returns the value + the brand whose KMS row supplied
-// it. A missing brand value is silently fallen back to Liquidity; any
-// other error short-circuits (so a transient KMS outage doesn't make
-// us send under the wrong identity).
+// it. A missing brand value is silently fallen back to the default
+// brand; any other error short-circuits (so a transient KMS outage
+// doesn't make us send under the wrong identity).
 func (r *ChainResolver) readBrandSecret(brand, providerID, field string) (string, string, error) {
 	path := "brand/" + brand + "/" + providerID + "/" + field
 	val, err := r.kms.GetSecret(brand, path)

@@ -10,10 +10,10 @@ package tenant
 
 // Multi-brand Plivo resolution.
 //
-// IAM lives at hanzo.id / lux.id / zoo.id / pars.id / liquidity.id; each
-// hostname maps to a brand slug (the JWT owner claim → X-Org-Id header).
-// Notify reads that brand slug and resolves which Plivo account sends the
-// SMS / WhatsApp / Voice message for that brand's user.
+// IAM lives at hanzo.id / lux.id / zoo.id / pars.id; each hostname maps
+// to a brand slug (the JWT owner claim → X-Org-Id header). Notify reads
+// that brand slug and resolves which Plivo account sends the SMS /
+// WhatsApp / Voice message for that brand's user.
 //
 // One way, two outcomes:
 //
@@ -22,15 +22,15 @@ package tenant
 //      `kms.hanzo.ai → brand/<slug>/plivo/{auth-id, auth-token, sender-id, from-email}`.
 //      ResolvePlivoConfig returns those values.
 //
-//   2. Liquidity-default path. The brand has not wired its own Plivo.
-//      KMS still holds `kms.hanzo.ai → brand/liquidity/plivo/*` — that's
-//      Liquidity's fleet-shared account. ResolvePlivoConfig returns
+//   2. Default-brand path. The brand has not wired its own Plivo.
+//      KMS still holds `kms.hanzo.ai → brand/hanzo/plivo/*` — that's
+//      the fleet-shared default account. ResolvePlivoConfig returns
 //      those.
 //
-// Fail-closed: if the default Liquidity record is missing or unreachable,
-// the resolver returns an error and the caller surfaces 503. No hard-
-// coded fallback (the rest of CLAUDE.md is loud about this — secrets
-// only ever live in KMS).
+// Fail-closed: if the default record is missing or unreachable, the
+// resolver returns an error and the caller surfaces 503. No hard-coded
+// fallback (the rest of CLAUDE.md is loud about this — secrets only
+// ever live in KMS).
 //
 // This file is the ONE place that knows about brand fallback. The
 // existing Resolver (tenant.go) keeps owning per-tenant Provider rows
@@ -49,8 +49,8 @@ import (
 
 // DefaultBrand is the brand slug whose KMS credentials are used when the
 // caller's brand has not configured an override. Lives in KMS at
-// `brand/liquidity/plivo/*`.
-const DefaultBrand = "liquidity"
+// `brand/hanzo/plivo/*`.
+const DefaultBrand = "hanzo"
 
 // PlivoBrandKMSPathPrefix is the KMS path under which per-brand Plivo
 // credentials live. Combined with brand slug:
@@ -81,7 +81,7 @@ const (
 type PlivoConfig struct {
 	// Brand is the slug whose credentials produced this config. When a
 	// brand override exists, Brand == the requested brand. When the
-	// resolver fell back to the Liquidity default, Brand == "liquidity".
+	// resolver fell back to the default, Brand == DefaultBrand.
 	// Callers use this to log which Plivo account actually sent.
 	Brand string
 
@@ -100,8 +100,8 @@ type PlivoConfig struct {
 	FromEmail string
 
 	// Override is true when this config came from the requested brand's
-	// own KMS entries (not the Liquidity default). Used by the platform
-	// UI's "current effective provider" indicator.
+	// own KMS entries (not the default brand). Used by the platform UI's
+	// "current effective provider" indicator.
 	Override bool
 }
 
@@ -125,17 +125,17 @@ func NewPlivoResolver(kms *kmsbridge.Client) (*PlivoResolver, error) {
 // when sending for brand. The lookup order is:
 //
 //  1. brand/<requested>/plivo/* — the brand's own override.
-//  2. brand/liquidity/plivo/*   — the Liquidity default.
+//  2. brand/<DefaultBrand>/plivo/* — the default brand fallback.
 //
 // On step 1 the resolver does NOT short-circuit on any non-EOF error: a
 // KMS access error against the requested brand falls through to the
 // default ONLY when the error indicates "secret not found". Any other
 // error (auth fail, transport, 5xx) is surfaced — silently degrading to
-// the Liquidity creds for someone else's transient KMS outage would
-// risk sending the wrong brand's SMS during the outage window.
+// the default creds for someone else's transient KMS outage would risk
+// sending the wrong brand's SMS during the outage window.
 //
-// On step 2 the resolver fail-closes: a missing or unreachable
-// Liquidity default returns an error. notify callers surface 503.
+// On step 2 the resolver fail-closes: a missing or unreachable default
+// returns an error. notify callers surface 503.
 //
 // The empty string for `brand` is rejected as a programming error —
 // the platform plugin always injects X-Org-Id before this fires.
@@ -155,10 +155,10 @@ func (r *PlivoResolver) ResolvePlivoConfig(ctx context.Context, brand string) (*
 		if !isMissingSecret(err) {
 			return nil, fmt.Errorf("plivo resolver: brand %q lookup failed: %w", brand, err)
 		}
-		// Fall through to the Liquidity default.
+		// Fall through to the default brand.
 	}
 
-	// Step 2 — Liquidity default. Errors here are fatal.
+	// Step 2 — default brand. Errors here are fatal.
 	cfg, err := r.fetchBrand(ctx, DefaultBrand)
 	if err != nil {
 		return nil, fmt.Errorf("plivo resolver: default brand %q lookup failed (fail-closed, no hard-coded fallback): %w", DefaultBrand, err)

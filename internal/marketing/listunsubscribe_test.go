@@ -20,7 +20,7 @@ func TestBuildHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	if !strings.HasPrefix(h.URL, "https://notify.dev.satschel.com/v1/notify/unsubscribe/") {
+	if !strings.HasPrefix(h.URL, "https://notify.dev.hanzo.ai/v1/notify/unsubscribe/") {
 		t.Fatalf("unexpected URL host: %s", h.URL)
 	}
 	if !strings.Contains(h.ListUnsubscribe, "<"+h.URL+">") {
@@ -43,8 +43,8 @@ func TestBuildHeadersProdHost(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Build(%q): %v", env, err)
 		}
-		if !strings.HasPrefix(h.URL, "https://notify.satschel.com/") {
-			t.Fatalf("env=%q: want notify.satschel.com host, got %s", env, h.URL)
+		if !strings.HasPrefix(h.URL, "https://notify.hanzo.ai/") {
+			t.Fatalf("env=%q: want notify.hanzo.ai host, got %s", env, h.URL)
 		}
 	}
 }
@@ -59,7 +59,7 @@ func TestBuildHeadersTokenRoundTrip(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 	// Pull the token out of the URL and verify it.
-	tok := strings.TrimPrefix(h.URL, "https://notify.test.satschel.com/v1/notify/unsubscribe/")
+	tok := strings.TrimPrefix(h.URL, "https://notify.test.hanzo.ai/v1/notify/unsubscribe/")
 	p, err := signer.Verify(tok, now)
 	if err != nil {
 		t.Fatalf("Verify minted token: %v", err)
@@ -79,8 +79,8 @@ func TestBuildHeadersNilSigner(t *testing.T) {
 
 func TestFooterLine(t *testing.T) {
 	t.Parallel()
-	h := Headers{URL: "https://notify.satschel.com/v1/notify/unsubscribe/abc"}
-	want := "Unsubscribe: https://notify.satschel.com/v1/notify/unsubscribe/abc"
+	h := Headers{URL: "https://notify.hanzo.ai/v1/notify/unsubscribe/abc"}
+	want := "Unsubscribe: https://notify.hanzo.ai/v1/notify/unsubscribe/abc"
 	if h.FooterLine() != want {
 		t.Fatalf("FooterLine = %q, want %q", h.FooterLine(), want)
 	}
