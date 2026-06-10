@@ -105,8 +105,8 @@ type Credentials map[string]string
 // Layout: per-secret. The provider row's kms_path is a directory; the
 // resolver appends one field-name segment per credential. Example:
 //
-//	kms_path = "tenants/liquidity/plivo"
-//	fetched  = tenants/liquidity/plivo/auth-id, …/auth-token, …/from-number
+//	kms_path = "tenants/<org>/plivo"
+//	fetched  = tenants/<org>/plivo/auth-id, …/auth-token, …/from-number
 //
 // The platform plugin's KMS facade returns one string per call.
 func (r *Resolver) fetchCreds(_ context.Context, row *core.Record) (Credentials, error) {

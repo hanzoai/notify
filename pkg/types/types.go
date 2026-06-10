@@ -149,7 +149,7 @@ type Provider struct {
 }
 
 // Tenant is the namespace row every other notify table relates to. The
-// id is the IAM org slug (e.g. "liquidity"), enforced as a kebab-case
+// id is the IAM org slug (e.g. "hanzo"), enforced as a kebab-case
 // PRIMARY KEY by the schema migration. One row per organisation. No
 // soft-delete; CascadeDelete on the relation cleans up dependents.
 type Tenant struct {

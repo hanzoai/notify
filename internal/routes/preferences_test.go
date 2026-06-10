@@ -369,7 +369,7 @@ func TestSMSInbound_StopMutesAndAcks(t *testing.T) {
 		},
 		ExpectedStatus: http.StatusOK,
 		ExpectedContent: []string{
-			"You have unsubscribed from Liquidity.io marketing SMS",
+			"You have unsubscribed from marketing SMS",
 		},
 		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 			seedTenant(t, app, "test-org")

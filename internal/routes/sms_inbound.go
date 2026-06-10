@@ -125,7 +125,7 @@ func mountSMSInbound(r *router.Router[*core.RequestEvent], app core.App) {
 		// envelope when the response content type is text/xml; we
 		// emit that shape so a single response satisfies both.
 		body := `<?xml version="1.0" encoding="UTF-8"?>
-<Response><Message>You have unsubscribed from Liquidity.io marketing SMS. Reply START to resubscribe.</Message></Response>`
+<Response><Message>You have unsubscribed from marketing SMS. Reply START to resubscribe.</Message></Response>`
 		e.Response.Header().Set("Content-Type", "text/xml; charset=utf-8")
 		e.Response.WriteHeader(http.StatusOK)
 		_, err = e.Response.Write([]byte(body))

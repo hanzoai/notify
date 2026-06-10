@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Seed brand/liquidity/plivo/* in kms.hanzo.ai.
+# Seed brand/<org>/plivo/* in kms.hanzo.ai.
 #
-# This is the fleet default every brand falls back to when it has not
+# This is the fleet default a tenant brand falls back to when it has not
 # wired its own Plivo override via the platform UI. Without these four
 # rows, /v1/notify/brand/plivo returns "fail-closed" for any brand
 # without its own creds — the multi-brand resolver REFUSES to invent a
 # hard-coded fallback.
 #
 # Required env (no hard-coded values in this repo):
+#   SEED_BRAND         — tenant brand (required, e.g. hanzo)
 #   KMS_ENDPOINT       — kms.hanzo.ai (or dev URL)
 #   IAM_ENDPOINT       — hanzo.id    (or dev URL)
 #   KMS_CLIENT_ID      — service account client_id
@@ -18,13 +19,14 @@
 # /proc/cmdline, or your shell history.
 #
 # Usage:
-#   make seed-plivo
+#   SEED_BRAND=<org> make seed-plivo
 # or:
-#   ./scripts/seed-plivo.sh
+#   SEED_BRAND=<org> ./scripts/seed-plivo.sh
 
 set -euo pipefail
 
-ORG="${SEED_BRAND:-liquidity}"
+: "${SEED_BRAND:?SEED_BRAND is required (tenant brand, e.g. hanzo)}"
+ORG="${SEED_BRAND}"
 
 if ! command -v kms >/dev/null; then
 	echo "kms: CLI not found on PATH. Build it from ~/work/hanzo/kms/cmd/kms or 'go install github.com/hanzoai/kms/cmd/kms@latest'." >&2
