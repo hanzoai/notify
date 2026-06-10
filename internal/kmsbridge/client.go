@@ -37,11 +37,11 @@ const secretCacheTTL = 1 * time.Minute
 // it from KMS_AUTH_TOKEN when tests want a fixed bearer).
 type Config struct {
 	// KMSEndpoint is the KMS server URL (e.g.
-	// "http://liquid-kms.liquidity.svc.cluster.local:8443").
+	// "http://hanzo-kms.hanzo.svc.cluster.local:8443").
 	KMSEndpoint string
 
 	// IAMEndpoint is the IAM server URL (e.g.
-	// "http://liquid-iam.liquidity.svc.cluster.local:8000"). The bridge
+	// "http://hanzo-iam.hanzo.svc.cluster.local:8000"). The bridge
 	// POSTs `IAMEndpoint + "/v1/iam/oauth/access_token"` to exchange
 	// client_credentials for a bearer.
 	IAMEndpoint string
@@ -121,7 +121,7 @@ func New(cfg Config) (*Client, error) {
 }
 
 // GetSecret fetches one secret value for (orgId, secretPath). secretPath
-// looks like "brand/liquidity/plivo/auth-id" — the last segment is the
+// looks like "brand/<org>/plivo/auth-id" — the last segment is the
 // secret name and everything before it is the directory.
 //
 // The 1-minute cache amortizes hot-path repeats (e.g. Plivo creds on
@@ -355,8 +355,8 @@ func (c *Client) httpDelete(ctx context.Context, orgId, secretPath string) error
 	return nil
 }
 
-// splitSecretPath splits "brand/liquidity/plivo/auth-id" into
-// (path="brand/liquidity/plivo", name="auth-id"). For a single-segment
+// splitSecretPath splits "brand/<org>/plivo/auth-id" into
+// (path="brand/<org>/plivo", name="auth-id"). For a single-segment
 // input, path is empty and the whole input is the name.
 func splitSecretPath(s string) (path, name string) {
 	s = strings.Trim(s, "/")

@@ -56,7 +56,7 @@ func main() {
 	kmsClient := boot.NewKMSClient()
 	resolver := tenant.New(app, kmsClient)
 	// Multi-brand Plivo resolver. Only constructed when KMS is wired —
-	// the per-brand fallback to the Liquidity default depends on KMS
+	// the per-brand fallback to the fleet default depends on KMS
 	// reads. Nil here means the /v1/notify/brand/plivo* surface returns
 	// 503 (the routes guard for this) which is the right local-dev
 	// behaviour.
@@ -126,8 +126,8 @@ func main() {
 			Address: addr,
 			// CONTRACT.md §6: namespace = per-tenant org slug. Notify is
 			// multi-tenant in principle but ships with one shared worker
-			// today; per-org namespaces land in the follow-up once the
-			// liquidity tenant traffic scales (tracked: hanzoai/notify#TODO).
+			// today; per-org namespaces land in the follow-up once
+			// tenant traffic scales (tracked: hanzoai/notify#TODO).
 			Namespace: envOr("TASKS_NAMESPACE", "default"),
 			TaskQueue: envOr("TASKS_QUEUE", "notify-send"),
 		}, activities)

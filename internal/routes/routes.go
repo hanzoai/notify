@@ -44,7 +44,7 @@ type Config struct {
 	KMSClient *kmsbridge.Client
 
 	// PlivoResolver handles per-brand Plivo credential resolution with
-	// fallback to the Liquidity default. Nil → /v1/notify/brand/plivo*
+	// fallback to the fleet default. Nil → /v1/notify/brand/plivo*
 	// returns 503.
 	PlivoResolver *tenant.PlivoResolver
 
