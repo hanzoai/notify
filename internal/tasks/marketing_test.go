@@ -145,8 +145,8 @@ func TestShouldUseMarketing(t *testing.T) {
 func TestExtractToken(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
-		"https://notify.dev.satschel.com/v1/notify/unsubscribe/ABC123": "ABC123",
-		"https://notify.satschel.com/v1/notify/unsubscribe/xyz":        "xyz",
+		"https://notify.dev.hanzo.ai/v1/notify/unsubscribe/ABC123": "ABC123",
+		"https://notify.hanzo.ai/v1/notify/unsubscribe/xyz":        "xyz",
 		"https://example.com/no/match":                                  "",
 		"":                                                              "",
 	}

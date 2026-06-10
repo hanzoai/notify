@@ -39,11 +39,11 @@ type Headers struct {
 
 // Config is what the caller has to know to build the headers. Env is
 // the env-specific subdomain segment ("dev", "test", or "" for prod →
-// notify.satschel.com).
+// notify.hanzo.ai).
 type Config struct {
 	// Env is dev/test/main/"" (empty == production). Affects the
 	// HTTPS hostname only — the mailto bridge is one address per
-	// fleet because notify.satschel.com proxies inbound to all envs.
+	// fleet because notify.hanzo.ai proxies inbound to all envs.
 	Env string
 
 	// Signer mints the token. Shared with the unsubscribe routes so
@@ -51,10 +51,10 @@ type Config struct {
 	Signer *unsubscribe.Signer
 
 	// MailtoDomain is the inbound MX-served domain for the mailto:
-	// alternative header. Defaults to "notify.satschel.com" when empty.
+	// alternative header. Defaults to "notify.hanzo.ai" when empty.
 	MailtoDomain string
 
-	// HTTPSHost overrides the computed notify.{env}.satschel.com host.
+	// HTTPSHost overrides the computed notify.{env}.hanzo.ai host.
 	// Used by self-hosted deployments and integration tests.
 	HTTPSHost string
 }
@@ -72,11 +72,11 @@ func (c Config) Build(userID, category string, now time.Time, ttl time.Duration)
 	}
 	host := c.HTTPSHost
 	if host == "" {
-		host = "notify." + envSegment(c.Env) + "satschel.com"
+		host = "notify." + envSegment(c.Env) + "hanzo.ai"
 	}
 	mailto := c.MailtoDomain
 	if mailto == "" {
-		mailto = "notify.satschel.com"
+		mailto = "notify.hanzo.ai"
 	}
 
 	httpsURL := "https://" + host + "/v1/notify/unsubscribe/" + url.PathEscape(token)
@@ -98,7 +98,7 @@ func (h Headers) FooterLine() string {
 
 // envSegment returns the {env}. URL segment including the trailing
 // dot. Production (empty Env) returns empty so the host collapses to
-// notify.satschel.com — no double dot, no /main/ noise.
+// notify.hanzo.ai — no double dot, no /main/ noise.
 func envSegment(env string) string {
 	env = strings.ToLower(strings.TrimSpace(env))
 	switch env {

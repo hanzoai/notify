@@ -29,11 +29,11 @@ func TestIsMarketing(t *testing.T) {
 
 func TestAppendHTMLFooter(t *testing.T) {
 	t.Parallel()
-	got := AppendHTMLFooter("<p>hi</p>", "https://notify.dev.satschel.com/v1/notify/unsubscribe/TOK")
+	got := AppendHTMLFooter("<p>hi</p>", "https://notify.dev.hanzo.ai/v1/notify/unsubscribe/TOK")
 	if !strings.Contains(got, "<p>hi</p>") {
 		t.Fatalf("original body lost: %s", got)
 	}
-	if !strings.Contains(got, `<a href="https://notify.dev.satschel.com/v1/notify/unsubscribe/TOK">click here</a>`) {
+	if !strings.Contains(got, `<a href="https://notify.dev.hanzo.ai/v1/notify/unsubscribe/TOK">click here</a>`) {
 		t.Fatalf("HTML link missing: %s", got)
 	}
 	if !strings.Contains(got, "<hr>") {
@@ -46,11 +46,11 @@ func TestAppendHTMLFooter(t *testing.T) {
 
 func TestAppendPlainFooter(t *testing.T) {
 	t.Parallel()
-	got := AppendPlainFooter("hello", "https://notify.satschel.com/v1/notify/unsubscribe/TOK")
+	got := AppendPlainFooter("hello", "https://notify.hanzo.ai/v1/notify/unsubscribe/TOK")
 	if !strings.Contains(got, "hello") {
 		t.Fatalf("original body lost: %s", got)
 	}
-	if !strings.Contains(got, "--\nUnsubscribe: https://notify.satschel.com/v1/notify/unsubscribe/TOK") {
+	if !strings.Contains(got, "--\nUnsubscribe: https://notify.hanzo.ai/v1/notify/unsubscribe/TOK") {
 		t.Fatalf("plain footer missing or malformed: %s", got)
 	}
 }

@@ -48,8 +48,8 @@ func TestRun_PrimaryWins(t *testing.T) {
 	fallback := &fakeProvider{id: "twilio"}
 	chain := &ProviderChain{
 		Channel:   ChainSMS,
-		Tenant:    "liquidity",
-		Brand:     "liquidity",
+		Tenant:    "acme",
+		Brand:     "acme",
 		Providers: []ChainProvider{primary, fallback},
 	}
 
@@ -178,8 +178,8 @@ func TestRun_TerminalRejection_NoFallback(t *testing.T) {
 	fallback := &fakeProvider{id: "twilio"}
 	chain := &ProviderChain{
 		Channel:   ChainSMS,
-		Tenant:    "liquidity",
-		Brand:     "liquidity",
+		Tenant:    "acme",
+		Brand:     "acme",
 		Providers: []ChainProvider{primary, fallback},
 	}
 
@@ -213,7 +213,7 @@ func TestRun_TerminalRejection_NoFallback(t *testing.T) {
 
 // TestRun_EmptyChain returns ErrNoProviders without crashing. A chain
 // can be empty when every provider failed to construct (missing KMS
-// secrets at every slot, including the Liquidity fallback). Surfacing
+// secrets at every slot, including the default-brand fallback). Surfacing
 // this as a distinct error lets callers return 503 — that's a config
 // problem, not a provider failure.
 func TestRun_EmptyChain(t *testing.T) {
@@ -246,8 +246,8 @@ func TestRun_ParentContextCanceled(t *testing.T) {
 	fallback := &fakeProvider{id: "twilio"}
 	chain := &ProviderChain{
 		Channel:   ChainSMS,
-		Tenant:    "liquidity",
-		Brand:     "liquidity",
+		Tenant:    "acme",
+		Brand:     "acme",
 		Providers: []ChainProvider{primary, fallback},
 	}
 
@@ -434,8 +434,8 @@ func TestRun_ConcurrentSafe(t *testing.T) {
 	primary := &fakeProvider{id: "plivo"}
 	chain := &ProviderChain{
 		Channel:   ChainSMS,
-		Tenant:    "liquidity",
-		Brand:     "liquidity",
+		Tenant:    "acme",
+		Brand:     "acme",
 		Providers: []ChainProvider{primary},
 	}
 

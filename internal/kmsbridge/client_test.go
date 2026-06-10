@@ -55,15 +55,15 @@ func TestGetSecret_CanonicalURL(t *testing.T) {
 		t.Fatalf("new: %v", err)
 	}
 
-	val, err := c.GetSecret("liquidity", "brand/liquidity/plivo/auth-id")
+	val, err := c.GetSecret("acme", "brand/acme/plivo/auth-id")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
 	if val != "plivo-auth-id-123" {
 		t.Errorf("got value %q, want plivo-auth-id-123", val)
 	}
-	if got := gotPath.Load().(string); got != "/v1/kms/orgs/liquidity/secrets/brand/liquidity/plivo/auth-id" {
-		t.Errorf("kms URL: got %q, want canonical /v1/kms/orgs/liquidity/secrets/brand/liquidity/plivo/auth-id", got)
+	if got := gotPath.Load().(string); got != "/v1/kms/orgs/acme/secrets/brand/acme/plivo/auth-id" {
+		t.Errorf("kms URL: got %q, want canonical /v1/kms/orgs/acme/secrets/brand/acme/plivo/auth-id", got)
 	}
 	if got := gotAuth.Load().(string); got != "Bearer test-jwt" {
 		t.Errorf("kms auth: got %q, want Bearer test-jwt", got)
@@ -128,8 +128,8 @@ func TestSetSecret_UpsertBody(t *testing.T) {
 	}))
 	defer iam.Close()
 	kms := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/kms/orgs/liquidity/secrets" {
-			t.Errorf("kms put path: got %q, want /v1/kms/orgs/liquidity/secrets", r.URL.Path)
+		if r.URL.Path != "/v1/kms/orgs/acme/secrets" {
+			t.Errorf("kms put path: got %q, want /v1/kms/orgs/acme/secrets", r.URL.Path)
 		}
 		b, _ := io.ReadAll(r.Body)
 		gotBody.Store(string(b))
@@ -138,7 +138,7 @@ func TestSetSecret_UpsertBody(t *testing.T) {
 	defer kms.Close()
 
 	c, _ := New(Config{KMSEndpoint: kms.URL, IAMEndpoint: iam.URL, ClientID: "x", ClientSecret: "y"})
-	if err := c.SetSecret("liquidity", "brand/liquidity/plivo/auth-id", "ABCDEF"); err != nil {
+	if err := c.SetSecret("acme", "brand/acme/plivo/auth-id", "ABCDEF"); err != nil {
 		t.Fatalf("set: %v", err)
 	}
 	var got struct {
@@ -149,7 +149,7 @@ func TestSetSecret_UpsertBody(t *testing.T) {
 	if err := json.Unmarshal([]byte(gotBody.Load().(string)), &got); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if got.Path != "brand/liquidity/plivo" || got.Name != "auth-id" || got.Value != "ABCDEF" {
+	if got.Path != "brand/acme/plivo" || got.Name != "auth-id" || got.Value != "ABCDEF" {
 		t.Errorf("upsert body wrong: %+v", got)
 	}
 }
@@ -226,8 +226,8 @@ func TestStaticBearer(t *testing.T) {
 // keep their slashes as path separators (not %2F).
 func TestSecretURL_Escaping(t *testing.T) {
 	c := &Client{kmsEndpoint: "http://kms.test"}
-	got := c.secretURL("liquidity", "brand/liquidity/plivo/auth-id")
-	want := "http://kms.test/v1/kms/orgs/liquidity/secrets/brand/liquidity/plivo/auth-id"
+	got := c.secretURL("acme", "brand/acme/plivo/auth-id")
+	want := "http://kms.test/v1/kms/orgs/acme/secrets/brand/acme/plivo/auth-id"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

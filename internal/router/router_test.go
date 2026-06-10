@@ -132,7 +132,7 @@ func TestMatrixAllows(t *testing.T) {
 func fullyOptedInPrefs() *Preferences {
 	return &Preferences{
 		UserID:        "u1",
-		OrgID:         "liquidity",
+		OrgID:         "acme",
 		PrimaryEmail:  "user@example.com",
 		PrimaryPhone:  "+15555550100",
 		WhatsAppPhone: "+15555550100",

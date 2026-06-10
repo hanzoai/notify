@@ -103,8 +103,8 @@ func main() {
 	}
 
 	// Marketing-header config. NOTIFY_ENV maps to the {env}. subdomain
-	// segment for the unsubscribe links: "dev" → notify.dev.satschel.com,
-	// "" / "main" / "prod" → notify.satschel.com. The host falls through
+	// segment for the unsubscribe links: "dev" → notify.dev.hanzo.ai,
+	// "" / "main" / "prod" → notify.hanzo.ai. The host falls through
 	// to the production hostname when unset, so misconfigured pods send
 	// links the user can still click (just at the wrong env). Activities
 	// only injects headers when this is wired AND the send is marketing-

@@ -30,7 +30,7 @@ ENV GOSUMDB=off
 # entry that rewrites every github.com URL to x-access-token://… form
 # the token authenticates against. The secret is mount-only — never
 # baked into a layer.
-ENV GOPRIVATE=github.com/hanzoai/*,github.com/luxfi/*,github.com/liquidityio/*
+ENV GOPRIVATE=github.com/hanzoai/*,github.com/luxfi/*
 
 RUN groupadd -g 65532 nonroot && \
     useradd  -u 65532 -g 65532 -M -s /usr/sbin/nologin nonroot
