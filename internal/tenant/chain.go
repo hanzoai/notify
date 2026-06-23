@@ -34,9 +34,15 @@ package tenant
 // KMS layout for provider credentials (canonical):
 //
 //   brand/<slug>/plivo/{auth-id, auth-token, sender-id, sender-id-link, from-email}
-//   brand/<slug>/twilio/{account-sid, auth-token, from-phone, messaging-sid}
+//   brand/<slug>/twilio/{account-sid, auth-token, from-phone, messaging-sid, from-email, sender-domain}
 //   brand/<slug>/ses/{access-key-id, secret-access-key, region, from-address, smtp-user, smtp-password, smtp-host, smtp-port}
 //   brand/<slug>/sendgrid/{api-key, from-address, from-name}
+//
+// Twilio is a dual-channel provider: SMS uses {account-sid, auth-token,
+// from-phone|messaging-sid} (provider id "twilio"); the native Email API
+// uses the SAME {account-sid, auth-token} plus {from-email, sender-domain}
+// (provider id "twilio_email"). One Twilio account, one credential pair,
+// two channels.
 //
 // Same brand-fallback rule as PlivoResolver: missing brand secrets
 // fall through to brand/hanzo/<provider>/* (the fleet default).
@@ -59,6 +65,7 @@ import (
 	"github.com/hanzoai/notify/service/plivo"
 	"github.com/hanzoai/notify/service/sendgrid"
 	"github.com/hanzoai/notify/service/twilio"
+	"github.com/hanzoai/notify/service/twilioemail"
 )
 
 // ChainChannel selects which provider chain to resolve. It is finer-
@@ -105,12 +112,17 @@ func canonicalChannel(s string) ChainChannel {
 // DefaultChainFor returns the default ordered provider id list for a
 // channel. Per-tenant overrides supersede this; see ChainResolver.
 //
-// The default chain matches the project spec:
+// The default chain is the hanzo fleet default (DefaultBrand). Twilio is
+// the transactional email provider; SES remains the fallback:
 //
-//   SMS              → plivo, twilio
-//   email_txn        → ses_api, ses_smtp
-//   email_otp        → ses_smtp, ses_api
-//   email_marketing  → sendgrid, ses_api
+//	SMS              → plivo, twilio
+//	email_txn        → twilio_email, ses_api, ses_smtp
+//	email_otp        → twilio_email, ses_smtp, ses_api
+//	email_marketing  → sendgrid, ses_api
+//
+// Marketing stays on sendgrid→ses because that class needs RFC 8058
+// List-Unsubscribe headers (RawSender); the transactional/OTP path does
+// not, so it leads with Twilio's native Email API.
 //
 // All providers are optional at the per-brand level: a missing secret
 // for a fallback provider is treated as "this provider not configured
@@ -122,9 +134,9 @@ func DefaultChainFor(ch ChainChannel) []string {
 	case ChainSMS:
 		return []string{ProviderPlivo, ProviderTwilio}
 	case ChainEmailTxn:
-		return []string{ProviderSESAPI, ProviderSESSMTP}
+		return []string{ProviderTwilioEmail, ProviderSESAPI, ProviderSESSMTP}
 	case ChainEmailOTP:
-		return []string{ProviderSESSMTP, ProviderSESAPI}
+		return []string{ProviderTwilioEmail, ProviderSESSMTP, ProviderSESAPI}
 	case ChainEmailMarketing:
 		return []string{ProviderSendGrid, ProviderSESAPI}
 	}
@@ -136,11 +148,12 @@ func DefaultChainFor(ch ChainChannel) []string {
 // field. They MUST stay stable — they are part of the wire contract
 // with the platform UI's "current effective chain" indicator.
 const (
-	ProviderPlivo    = "plivo"
-	ProviderTwilio   = "twilio"
-	ProviderSESAPI   = "ses_api"
-	ProviderSESSMTP  = "ses_smtp"
-	ProviderSendGrid = "sendgrid"
+	ProviderPlivo       = "plivo"
+	ProviderTwilio      = "twilio"       // Twilio SMS
+	ProviderTwilioEmail = "twilio_email" // Twilio native Email API
+	ProviderSESAPI      = "ses_api"
+	ProviderSESSMTP     = "ses_smtp"
+	ProviderSendGrid    = "sendgrid"
 )
 
 // providerChainKMSPath is the KMS path where per-tenant chain overrides
@@ -206,9 +219,9 @@ type ChainProvider interface {
 // Retry policy (one and only one):
 //   - per-attempt context: a 10s deadline derived from the parent
 //   - per-attempt outcome:
-//       ok        — the provider succeeded; return immediately
-//       terminal  — the recipient is invalid; stop, no fallback
-//       retryable — anything else; advance to the next provider
+//     ok        — the provider succeeded; return immediately
+//     terminal  — the recipient is invalid; stop, no fallback
+//     retryable — anything else; advance to the next provider
 //   - whole-chain context: a 30s deadline ceiling
 //
 // Logger is optional; nil means no per-attempt log line is emitted.
@@ -538,7 +551,7 @@ func (r *ChainResolver) fetchOrder(brand string, channel ChainChannel) []string 
 // buildProvider branch ships.
 func knownProvider(id string) bool {
 	switch id {
-	case ProviderPlivo, ProviderTwilio,
+	case ProviderPlivo, ProviderTwilio, ProviderTwilioEmail,
 		ProviderSESAPI, ProviderSESSMTP,
 		ProviderSendGrid:
 		return true
@@ -555,6 +568,8 @@ func (r *ChainResolver) buildProvider(ctx context.Context, brand, providerID str
 		return r.buildPlivo(ctx, brand)
 	case ProviderTwilio:
 		return r.buildTwilio(ctx, brand)
+	case ProviderTwilioEmail:
+		return r.buildTwilioEmail(ctx, brand)
 	case ProviderSESAPI:
 		return r.buildSESAPI(ctx, brand)
 	case ProviderSESSMTP:
@@ -653,6 +668,29 @@ func (r *ChainResolver) buildTwilio(_ context.Context, brand string) (ChainProvi
 		return nil, b1, fmt.Errorf("twilio construct: %w", err)
 	}
 	return &twilioChainProvider{svc: svc}, b1, nil
+}
+
+// buildTwilioEmail constructs the Twilio native Email provider. It reuses
+// the SAME account credentials as Twilio SMS (brand/<slug>/twilio/
+// {account-sid, auth-token}) and adds from-email — the verified sender on
+// brand/<slug>/twilio/sender-domain (e.g. no-reply@send.hanzo.ai). The
+// optional from-name is the display name; absent → the from-email.
+func (r *ChainResolver) buildTwilioEmail(_ context.Context, brand string) (ChainProvider, string, error) {
+	accountSID, b1, err := r.readBrandSecret(brand, ProviderTwilio, "account-sid")
+	if err != nil {
+		return nil, b1, fmt.Errorf("twilio_email: %w", err)
+	}
+	authToken, _, err := r.readBrandSecret(brand, ProviderTwilio, "auth-token")
+	if err != nil {
+		return nil, b1, fmt.Errorf("twilio_email: %w", err)
+	}
+	fromEmail, _, err := r.readBrandSecret(brand, ProviderTwilio, "from-email")
+	if err != nil {
+		return nil, b1, fmt.Errorf("twilio_email: %w", err)
+	}
+	fromName := r.readBrandSecretOptional(brand, ProviderTwilio, "from-name")
+	svc := twilioemail.New(accountSID, authToken, fromEmail, fromName)
+	return &twilioEmailChainProvider{svc: svc}, b1, nil
 }
 
 func (r *ChainResolver) buildSESAPI(_ context.Context, brand string) (ChainProvider, string, error) {
@@ -755,6 +793,16 @@ func (p *twilioChainProvider) Send(ctx context.Context, subject, body, to string
 	return p.svc.Send(ctx, subject, body)
 }
 
+type twilioEmailChainProvider struct {
+	svc *twilioemail.Service
+}
+
+func (p *twilioEmailChainProvider) ID() string { return ProviderTwilioEmail }
+func (p *twilioEmailChainProvider) Send(ctx context.Context, subject, body, to string) error {
+	p.svc.AddReceivers(to)
+	return p.svc.Send(ctx, subject, body)
+}
+
 type sesAPIChainProvider struct {
 	svc *amazonses.AmazonSES
 }
@@ -789,13 +837,20 @@ func (p *sendgridChainProvider) Send(ctx context.Context, subject, body, to stri
 // ChainProvider; the notify.Notifier check is documentation that the
 // wrapped service is a real Notifier and not a stub.
 var (
-	_ ChainProvider  = (*plivoChainProvider)(nil)
-	_ ChainProvider  = (*twilioChainProvider)(nil)
-	_ ChainProvider  = (*sesAPIChainProvider)(nil)
-	_ ChainProvider  = (*sesSMTPChainProvider)(nil)
-	_ ChainProvider  = (*sendgridChainProvider)(nil)
+	_ ChainProvider   = (*plivoChainProvider)(nil)
+	_ ChainProvider   = (*twilioChainProvider)(nil)
+	_ ChainProvider   = (*twilioEmailChainProvider)(nil)
+	_ ChainProvider   = (*sesAPIChainProvider)(nil)
+	_ ChainProvider   = (*sesSMTPChainProvider)(nil)
+	_ ChainProvider   = (*sendgridChainProvider)(nil)
+
+	// SES API is the only provider that exposes RawSender for now —
+	// SendEmail cannot inject custom headers, so the raw-MIME path is
+	// the only way for List-Unsubscribe to ride along.
+	_ RawSender       = (*sesAPIChainProvider)(nil)
 	_ notify.Notifier = (*plivo.Service)(nil)
 	_ notify.Notifier = (*twilio.Service)(nil)
+	_ notify.Notifier = (*twilioemail.Service)(nil)
 	_ notify.Notifier = (*sendgrid.SendGrid)(nil)
 	_ notify.Notifier = (*mail.Mail)(nil)
 

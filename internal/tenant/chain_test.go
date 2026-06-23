@@ -17,10 +17,10 @@ import (
 // behavior it wants (success, retryable failure, terminal failure,
 // hang).
 type fakeProvider struct {
-	id      string
-	err     error
-	delay   time.Duration
-	calls   int32
+	id    string
+	err   error
+	delay time.Duration
+	calls int32
 }
 
 func (p *fakeProvider) ID() string { return p.id }
@@ -346,8 +346,8 @@ func TestDefaultChainFor(t *testing.T) {
 		want []string
 	}{
 		{ChainSMS, []string{ProviderPlivo, ProviderTwilio}},
-		{ChainEmailTxn, []string{ProviderSESAPI, ProviderSESSMTP}},
-		{ChainEmailOTP, []string{ProviderSESSMTP, ProviderSESAPI}},
+		{ChainEmailTxn, []string{ProviderTwilioEmail, ProviderSESAPI, ProviderSESSMTP}},
+		{ChainEmailOTP, []string{ProviderTwilioEmail, ProviderSESSMTP, ProviderSESAPI}},
 		{ChainEmailMarketing, []string{ProviderSendGrid, ProviderSESAPI}},
 		{"", nil},
 	}
@@ -369,13 +369,14 @@ func TestDefaultChainFor(t *testing.T) {
 func TestKnownProvider(t *testing.T) {
 	t.Parallel()
 	want := map[string]bool{
-		ProviderPlivo:    true,
-		ProviderTwilio:   true,
-		ProviderSESAPI:   true,
-		ProviderSESSMTP:  true,
-		ProviderSendGrid: true,
-		"":               false,
-		"mailgun":        false, // library has it but chain doesn't build it yet
+		ProviderPlivo:       true,
+		ProviderTwilio:      true,
+		ProviderTwilioEmail: true,
+		ProviderSESAPI:      true,
+		ProviderSESSMTP:     true,
+		ProviderSendGrid:    true,
+		"":                  false,
+		"mailgun":           false, // library has it but chain doesn't build it yet
 	}
 	for id, want := range want {
 		if got := knownProvider(id); got != want {
