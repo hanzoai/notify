@@ -26,9 +26,10 @@ import (
 	"github.com/hanzoai/notify"
 	"github.com/hanzoai/notify/internal/kmsbridge"
 	"github.com/hanzoai/notify/internal/schema"
+	"github.com/hanzoai/notify/pkg/types"
 	"github.com/hanzoai/notify/service/mail"
 	"github.com/hanzoai/notify/service/plivo"
-	"github.com/hanzoai/notify/pkg/types"
+	"github.com/hanzoai/notify/service/twilioemail"
 )
 
 // Resolver is the entry point routes call. It owns the base app
@@ -160,6 +161,10 @@ func credKeysForService(service string) []string {
 		return []string{"auth-id", "auth-token", "from-number"}
 	case "twilio":
 		return []string{"account-sid", "auth-token", "from-number"}
+	case "twilio_email":
+		// Twilio native Email API: same account creds as SMS + a verified
+		// from-email on the Twilio sender domain. from-name is optional.
+		return []string{"account-sid", "auth-token", "from-email"}
 	case "sendgrid":
 		return []string{"api-key", "sender-email", "sender-name"}
 	case "mailgun":
@@ -216,6 +221,14 @@ func constructProvider(service string, c Credentials, to []string) (notify.Notif
 		// move to a TLS-only path notices the package).
 		_ = smtp.PlainAuth
 		return m, nil
+
+	case "twilio_email":
+		if c["account-sid"] == "" || c["auth-token"] == "" || c["from-email"] == "" {
+			return nil, errors.New("tenant: twilio_email requires account-sid, auth-token and from-email")
+		}
+		te := twilioemail.New(c["account-sid"], c["auth-token"], c["from-email"], c["from-name"])
+		te.AddReceivers(to...)
+		return te, nil
 	}
 	return nil, fmt.Errorf("tenant: provider %q not yet wired (library has the impl — add a constructProvider branch)", service)
 }
