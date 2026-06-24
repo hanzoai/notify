@@ -1,8 +1,14 @@
 package amazonses
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"mime"
+	"mime/quotedprintable"
+	"sort"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -18,6 +24,11 @@ type sesClient interface {
 		params *ses.SendEmailInput,
 		optFns ...func(options *ses.Options),
 	) (*ses.SendEmailOutput, error)
+	SendRawEmail(
+		ctx context.Context,
+		params *ses.SendRawEmailInput,
+		optFns ...func(options *ses.Options),
+	) (*ses.SendRawEmailOutput, error)
 }
 
 // Compile-time check to ensure that ses.Client implements the sesClient interface.
@@ -87,4 +98,71 @@ func (a AmazonSES) Send(ctx context.Context, subject, message string) error {
 	}
 
 	return nil
+}
+
+// SendRaw sends an HTML message with caller-supplied extra MIME headers
+// (e.g. RFC 8058 List-Unsubscribe / List-Unsubscribe-Post) via the SES
+// SendRawEmail API. The structured SendEmail call cannot carry custom
+// headers, so the raw-MIME path is the only way for those headers to ride
+// along. Header keys are emitted in sorted order for deterministic output.
+func (a AmazonSES) SendRaw(ctx context.Context, subject, message string, extraHeaders map[string]string) error {
+	if a.senderAddress == nil {
+		return fmt.Errorf("send raw mail using Amazon SES service: sender address not set")
+	}
+
+	var buf bytes.Buffer
+	buf.WriteString("From: " + aws.ToString(a.senderAddress) + "\r\n")
+	if len(a.receiverAddresses) > 0 {
+		buf.WriteString("To: " + strings.Join(a.receiverAddresses, ", ") + "\r\n")
+	}
+	buf.WriteString("Subject: " + mimeEncodeHeader(subject) + "\r\n")
+	buf.WriteString("MIME-Version: 1.0\r\n")
+
+	keys := make([]string, 0, len(extraHeaders))
+	for k := range extraHeaders {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		buf.WriteString(k + ": " + extraHeaders[k] + "\r\n")
+	}
+
+	buf.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	buf.WriteString("Content-Transfer-Encoding: quoted-printable\r\n")
+	buf.WriteString("\r\n")
+	if err := writeQuotedPrintable(&buf, message); err != nil {
+		return fmt.Errorf("send raw mail using Amazon SES service: encode body: %w", err)
+	}
+
+	input := &ses.SendRawEmailInput{
+		Source:       a.senderAddress,
+		Destinations: a.receiverAddresses,
+		RawMessage:   &types.RawMessage{Data: buf.Bytes()},
+	}
+
+	if _, err := a.client.SendRawEmail(ctx, input); err != nil {
+		return fmt.Errorf("send raw mail using Amazon SES service: %w", err)
+	}
+
+	return nil
+}
+
+// mimeEncodeHeader RFC 2047-encodes a header value when it contains
+// non-ASCII bytes; pure-ASCII values pass through unchanged.
+func mimeEncodeHeader(v string) string {
+	for i := 0; i < len(v); i++ {
+		if v[i] > 127 {
+			return mime.QEncoding.Encode("UTF-8", v)
+		}
+	}
+	return v
+}
+
+// writeQuotedPrintable encodes body as quoted-printable into w.
+func writeQuotedPrintable(w *bytes.Buffer, body string) error {
+	qp := quotedprintable.NewWriter(w)
+	if _, err := io.WriteString(qp, body); err != nil {
+		return err
+	}
+	return qp.Close()
 }
