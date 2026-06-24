@@ -11,7 +11,7 @@ package tenant
 // Multi-provider retry / fallback for notify.
 //
 // Today notify resolves ONE provider per send. That makes Plivo a single
-// point of failure for SMS and SES the single point of failure for
+// point of failure for SMS and Twilio the single point of failure for
 // email. This file generalizes the resolver into a per-channel
 // ordered chain: primary → fallback1 → fallback2. On a retryable
 // failure we walk to the next provider; on a terminal failure (invalid
@@ -35,14 +35,14 @@ package tenant
 //
 //   brand/<slug>/plivo/{auth-id, auth-token, sender-id, sender-id-link, from-email}
 //   brand/<slug>/twilio/{account-sid, auth-token, from-phone, messaging-sid, from-email, sender-domain}
-//   brand/<slug>/ses/{access-key-id, secret-access-key, region, from-address, smtp-user, smtp-password, smtp-host, smtp-port}
 //   brand/<slug>/sendgrid/{api-key, from-address, from-name}
 //
 // Twilio is a dual-channel provider: SMS uses {account-sid, auth-token,
 // from-phone|messaging-sid} (provider id "twilio"); the native Email API
 // uses the SAME {account-sid, auth-token} plus {from-email, sender-domain}
 // (provider id "twilio_email"). One Twilio account, one credential pair,
-// two channels.
+// two channels — so Twilio is both the SMS and the email backbone, and
+// email needs no separate cloud-mail provider.
 //
 // Same brand-fallback rule as PlivoResolver: missing brand secrets
 // fall through to brand/hanzo/<provider>/* (the fleet default).
@@ -53,15 +53,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/smtp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/hanzoai/notify"
 	"github.com/hanzoai/notify/internal/kmsbridge"
-	"github.com/hanzoai/notify/service/amazonses"
-	"github.com/hanzoai/notify/service/mail"
 	"github.com/hanzoai/notify/service/plivo"
 	"github.com/hanzoai/notify/service/sendgrid"
 	"github.com/hanzoai/notify/service/twilio"
@@ -70,10 +67,10 @@ import (
 
 // ChainChannel selects which provider chain to resolve. It is finer-
 // grained than types.Channel because email has three distinct routing
-// profiles (transactional, OTP, marketing) that often want different
-// providers — e.g. SES API for batched transactional but SES SMTP for
-// the IAM OTP path because IAM holds the connection open. SMS has a
-// single chain today.
+// profiles (transactional, OTP, marketing) that can want different
+// providers — the transactional/OTP classes lead with Twilio's native
+// Email API; marketing keeps sendgrid as a fallback for its RFC 8058
+// header needs. SMS has a single chain today.
 type ChainChannel string
 
 const (
@@ -112,17 +109,18 @@ func canonicalChannel(s string) ChainChannel {
 // DefaultChainFor returns the default ordered provider id list for a
 // channel. Per-tenant overrides supersede this; see ChainResolver.
 //
-// The default chain is the hanzo fleet default (DefaultBrand). Twilio is
-// the transactional email provider; SES remains the fallback:
+// The default chain is the hanzo fleet default (DefaultBrand). Email is
+// Twilio-native — every email class leads with Twilio's Email API, which
+// shares the SMS account credentials:
 //
 //	SMS              → plivo, twilio
-//	email_txn        → twilio_email, ses_api, ses_smtp
-//	email_otp        → twilio_email, ses_smtp, ses_api
-//	email_marketing  → sendgrid, ses_api
+//	email_txn        → twilio_email
+//	email_otp        → twilio_email
+//	email_marketing  → twilio_email, sendgrid
 //
-// Marketing stays on sendgrid→ses because that class needs RFC 8058
-// List-Unsubscribe headers (RawSender); the transactional/OTP path does
-// not, so it leads with Twilio's native Email API.
+// Marketing keeps sendgrid as a fallback because that class needs RFC
+// 8058 List-Unsubscribe headers; transactional/OTP need only the native
+// Twilio Email API.
 //
 // All providers are optional at the per-brand level: a missing secret
 // for a fallback provider is treated as "this provider not configured
@@ -134,11 +132,11 @@ func DefaultChainFor(ch ChainChannel) []string {
 	case ChainSMS:
 		return []string{ProviderPlivo, ProviderTwilio}
 	case ChainEmailTxn:
-		return []string{ProviderTwilioEmail, ProviderSESAPI, ProviderSESSMTP}
+		return []string{ProviderTwilioEmail}
 	case ChainEmailOTP:
-		return []string{ProviderTwilioEmail, ProviderSESSMTP, ProviderSESAPI}
+		return []string{ProviderTwilioEmail}
 	case ChainEmailMarketing:
-		return []string{ProviderSendGrid, ProviderSESAPI}
+		return []string{ProviderTwilioEmail, ProviderSendGrid}
 	}
 	return nil
 }
@@ -151,8 +149,6 @@ const (
 	ProviderPlivo       = "plivo"
 	ProviderTwilio      = "twilio"       // Twilio SMS
 	ProviderTwilioEmail = "twilio_email" // Twilio native Email API
-	ProviderSESAPI      = "ses_api"
-	ProviderSESSMTP     = "ses_smtp"
 	ProviderSendGrid    = "sendgrid"
 )
 
@@ -210,6 +206,18 @@ type ProviderChain struct {
 type ChainProvider interface {
 	ID() string
 	Send(ctx context.Context, subject, body string, to string) error
+}
+
+// RawSender is the optional capability a ChainProvider advertises when it
+// can attach caller-supplied MIME headers to an email — the RFC 8058
+// List-Unsubscribe / List-Unsubscribe-Post pair the marketing path needs.
+// The plain Send surface cannot inject headers, so the marketing sender
+// type-asserts to RawSender and falls back to Send when a provider does
+// not implement it. Twilio's native Email API carries a headers map, so
+// twilio_email is the implementer.
+type RawSender interface {
+	ChainProvider
+	SendRaw(ctx context.Context, subject, body, to string, headers map[string]string) error
 }
 
 // Run walks the chain. It returns the winning provider id and the
@@ -552,7 +560,6 @@ func (r *ChainResolver) fetchOrder(brand string, channel ChainChannel) []string 
 func knownProvider(id string) bool {
 	switch id {
 	case ProviderPlivo, ProviderTwilio, ProviderTwilioEmail,
-		ProviderSESAPI, ProviderSESSMTP,
 		ProviderSendGrid:
 		return true
 	}
@@ -570,10 +577,6 @@ func (r *ChainResolver) buildProvider(ctx context.Context, brand, providerID str
 		return r.buildTwilio(ctx, brand)
 	case ProviderTwilioEmail:
 		return r.buildTwilioEmail(ctx, brand)
-	case ProviderSESAPI:
-		return r.buildSESAPI(ctx, brand)
-	case ProviderSESSMTP:
-		return r.buildSESSMTP(ctx, brand)
 	case ProviderSendGrid:
 		return r.buildSendGrid(ctx, brand)
 	}
@@ -693,62 +696,6 @@ func (r *ChainResolver) buildTwilioEmail(_ context.Context, brand string) (Chain
 	return &twilioEmailChainProvider{svc: svc}, b1, nil
 }
 
-func (r *ChainResolver) buildSESAPI(_ context.Context, brand string) (ChainProvider, string, error) {
-	accessKey, b1, err := r.readBrandSecret(brand, "ses", "access-key-id")
-	if err != nil {
-		return nil, b1, fmt.Errorf("ses_api: %w", err)
-	}
-	secretKey, _, err := r.readBrandSecret(brand, "ses", "secret-access-key")
-	if err != nil {
-		return nil, b1, fmt.Errorf("ses_api: %w", err)
-	}
-	region, _, err := r.readBrandSecret(brand, "ses", "region")
-	if err != nil {
-		return nil, b1, fmt.Errorf("ses_api: %w", err)
-	}
-	from, _, err := r.readBrandSecret(brand, "ses", "from-address")
-	if err != nil {
-		return nil, b1, fmt.Errorf("ses_api: %w", err)
-	}
-	svc, err := amazonses.New(accessKey, secretKey, region, from)
-	if err != nil {
-		return nil, b1, fmt.Errorf("ses_api construct: %w", err)
-	}
-	return &sesAPIChainProvider{svc: svc}, b1, nil
-}
-
-func (r *ChainResolver) buildSESSMTP(_ context.Context, brand string) (ChainProvider, string, error) {
-	smtpUser, b1, err := r.readBrandSecret(brand, "ses", "smtp-user")
-	if err != nil {
-		return nil, b1, fmt.Errorf("ses_smtp: %w", err)
-	}
-	smtpPass, _, err := r.readBrandSecret(brand, "ses", "smtp-password")
-	if err != nil {
-		return nil, b1, fmt.Errorf("ses_smtp: %w", err)
-	}
-	from, _, err := r.readBrandSecret(brand, "ses", "from-address")
-	if err != nil {
-		return nil, b1, fmt.Errorf("ses_smtp: %w", err)
-	}
-	host := r.readBrandSecretOptional(brand, "ses", "smtp-host")
-	if host == "" {
-		// Default to the regional SES SMTP endpoint when the host is
-		// not pinned. The region field must exist for SES API; reuse it.
-		region, _, err := r.readBrandSecret(brand, "ses", "region")
-		if err != nil {
-			return nil, b1, fmt.Errorf("ses_smtp: %w", err)
-		}
-		host = "email-smtp." + region + ".amazonaws.com"
-	}
-	port := r.readBrandSecretOptional(brand, "ses", "smtp-port")
-	if port == "" {
-		port = "587"
-	}
-	svc := mail.New(from, host+":"+port)
-	svc.AuthenticateSMTP("", smtpUser, smtpPass, host)
-	return &sesSMTPChainProvider{svc: svc}, b1, nil
-}
-
 func (r *ChainResolver) buildSendGrid(_ context.Context, brand string) (ChainProvider, string, error) {
 	apiKey, b1, err := r.readBrandSecret(brand, ProviderSendGrid, "api-key")
 	if err != nil {
@@ -803,24 +750,12 @@ func (p *twilioEmailChainProvider) Send(ctx context.Context, subject, body, to s
 	return p.svc.Send(ctx, subject, body)
 }
 
-type sesAPIChainProvider struct {
-	svc *amazonses.AmazonSES
-}
-
-func (p *sesAPIChainProvider) ID() string { return ProviderSESAPI }
-func (p *sesAPIChainProvider) Send(ctx context.Context, subject, body, to string) error {
+// SendRaw satisfies RawSender: Twilio's native Email API accepts a custom
+// headers map, so List-Unsubscribe / List-Unsubscribe-Post ride along on
+// the marketing path without leaving the Twilio account.
+func (p *twilioEmailChainProvider) SendRaw(ctx context.Context, subject, body, to string, headers map[string]string) error {
 	p.svc.AddReceivers(to)
-	return p.svc.Send(ctx, subject, body)
-}
-
-type sesSMTPChainProvider struct {
-	svc *mail.Mail
-}
-
-func (p *sesSMTPChainProvider) ID() string { return ProviderSESSMTP }
-func (p *sesSMTPChainProvider) Send(ctx context.Context, subject, body, to string) error {
-	p.svc.AddReceivers(to)
-	return p.svc.Send(ctx, subject, body)
+	return p.svc.SendWithHeaders(ctx, subject, body, headers)
 }
 
 type sendgridChainProvider struct {
@@ -837,30 +772,18 @@ func (p *sendgridChainProvider) Send(ctx context.Context, subject, body, to stri
 // ChainProvider; the notify.Notifier check is documentation that the
 // wrapped service is a real Notifier and not a stub.
 var (
-	_ ChainProvider   = (*plivoChainProvider)(nil)
-	_ ChainProvider   = (*twilioChainProvider)(nil)
-	_ ChainProvider   = (*twilioEmailChainProvider)(nil)
-	_ ChainProvider   = (*sesAPIChainProvider)(nil)
-	_ ChainProvider   = (*sesSMTPChainProvider)(nil)
-	_ ChainProvider   = (*sendgridChainProvider)(nil)
+	_ ChainProvider = (*plivoChainProvider)(nil)
+	_ ChainProvider = (*twilioChainProvider)(nil)
+	_ ChainProvider = (*twilioEmailChainProvider)(nil)
+	_ ChainProvider = (*sendgridChainProvider)(nil)
 
-	// SES API is the only provider that exposes RawSender for now —
-	// SendEmail cannot inject custom headers, so the raw-MIME path is
-	// the only way for List-Unsubscribe to ride along.
-	_ RawSender       = (*sesAPIChainProvider)(nil)
+	// Twilio's native Email API is the only provider that exposes
+	// RawSender today — its JSON body carries a headers map, so the
+	// RFC 8058 List-Unsubscribe pair rides along on the marketing path.
+	_ RawSender = (*twilioEmailChainProvider)(nil)
+
 	_ notify.Notifier = (*plivo.Service)(nil)
 	_ notify.Notifier = (*twilio.Service)(nil)
 	_ notify.Notifier = (*twilioemail.Service)(nil)
 	_ notify.Notifier = (*sendgrid.SendGrid)(nil)
-	_ notify.Notifier = (*mail.Mail)(nil)
-
-	// The notify.Notifier compile-time check for amazonses.AmazonSES
-	// is here as documentation: the library exposes Send via a value
-	// receiver so the pointer-receiver assignment is the right one.
-	_ notify.Notifier = (*amazonses.AmazonSES)(nil)
-
-	// _ keeps the smtp package imported — mail.AuthenticateSMTP wraps
-	// smtp.PlainAuth internally, so a future move to TLS-only auth
-	// must update this file too.
-	_ = smtp.PlainAuth
 )

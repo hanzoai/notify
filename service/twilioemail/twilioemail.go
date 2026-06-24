@@ -66,6 +66,10 @@ type emailRequest struct {
 	// Exactly one of Text/HTML is populated per send (HTML by default).
 	Text string `json:"text,omitempty"`
 	HTML string `json:"html,omitempty"`
+	// Headers carries caller-supplied MIME headers (e.g. the RFC 8058
+	// List-Unsubscribe / List-Unsubscribe-Post pair). Omitted when empty
+	// so the structured Send path produces an identical body to before.
+	Headers map[string]string `json:"headers,omitempty"`
 }
 
 // emailAddress is the {email,name} pair used for both sender and
@@ -117,6 +121,19 @@ func (s *Service) BodyFormat(format BodyType) {
 // previously-added recipient. subject + message become the email subject
 // and body; the body is sent as HTML unless BodyFormat(PlainText) was set.
 func (s *Service) Send(ctx context.Context, subject, message string) error {
+	return s.send(ctx, subject, message, nil)
+}
+
+// SendWithHeaders is Send plus a custom MIME-header map carried in the
+// Twilio Emails request body — the RFC 8058 List-Unsubscribe /
+// List-Unsubscribe-Post pair the marketing path needs. A nil/empty map
+// behaves exactly like Send.
+func (s *Service) SendWithHeaders(ctx context.Context, subject, message string, headers map[string]string) error {
+	return s.send(ctx, subject, message, headers)
+}
+
+// send is the single POST path shared by Send and SendWithHeaders.
+func (s *Service) send(ctx context.Context, subject, message string, headers map[string]string) error {
 	if len(s.receiverAddresses) == 0 {
 		return nil
 	}
@@ -133,6 +150,9 @@ func (s *Service) Send(ctx context.Context, subject, message string) error {
 		reqBody.Text = message
 	} else {
 		reqBody.HTML = message
+	}
+	if len(headers) > 0 {
+		reqBody.Headers = headers
 	}
 
 	payload, err := json.Marshal(reqBody)

@@ -213,7 +213,7 @@ func writeHTML(e *core.RequestEvent, status int, body string) error {
 // confirmationHTML renders the success page. Resubscribed=true changes
 // the headline + offers the inverse one-click link.
 func confirmationHTML(p unsubscribe.Payload, resubscribed bool) string {
-	what := "all Hanzo marketing"
+	what := "all marketing"
 	if p.Category != "" {
 		what = html.EscapeString(p.Category)
 	}

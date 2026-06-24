@@ -1,8 +1,23 @@
-// Package kmsbridge is notify's direct line to Hanzo KMS.
+// Package kmsbridge is notify's direct line to Hanzo KMS, and the ONE
+// place in notify that resolves a secret. Every per-brand provider
+// credential — Twilio, Plivo, SendGrid — is read here at send time.
 //
 // Canonical KMS routes (luxfi/kms post-canonical-migration):
 //   - GET/DELETE: /v1/kms/orgs/{org}/secrets/{path}/{name}
 //   - POST:       /v1/kms/orgs/{org}/secrets   (body: {path, name, value})
+//
+// Transport: KMS is an HTTP service (kms.hanzo.svc:80 in-cluster,
+// https://kms.hanzo.ai externally). It exposes ONLY the HTTP secrets API
+// above — it is NOT a base-collections endpoint, so it does not speak the
+// base ZAP record protocol. notify itself runs on the ZAP service mesh
+// (its base app exposes records over ZAP, and it reaches tasks over ZAP),
+// and the fleet's secret-access convention is written as a `zap://`
+// endpoint for uniformity. NormalizeEndpoint reconciles the two: a
+// `zap://host[:port]` KMS endpoint is resolved to the KMS HTTP service
+// (scheme http, the ZAP :9999 port dropped — KMS has no ZAP listener),
+// so secret reads route correctly regardless of which scheme the
+// deployment hands us. This is the single seam where the mesh-style
+// config meets KMS's HTTP API.
 //
 // Auth: IAM client_credentials grant at /v1/iam/oauth/access_token.
 // The bearer is cached in-process until 60s before expiry. A static
@@ -105,19 +120,79 @@ func New(cfg Config) (*Client, error) {
 			return nil, errors.New("kmsbridge: ClientSecret is required (no StaticBearer override)")
 		}
 	}
+	kmsEndpoint, err := NormalizeEndpoint(cfg.KMSEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("kmsbridge: KMSEndpoint: %w", err)
+	}
+	iamEndpoint, err := NormalizeEndpoint(cfg.IAMEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("kmsbridge: IAMEndpoint: %w", err)
+	}
 	httpClient := cfg.HTTPClient
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 15 * time.Second}
 	}
 	return &Client{
-		kmsEndpoint:  strings.TrimRight(cfg.KMSEndpoint, "/"),
-		iamEndpoint:  strings.TrimRight(cfg.IAMEndpoint, "/"),
+		kmsEndpoint:  kmsEndpoint,
+		iamEndpoint:  iamEndpoint,
 		clientID:     cfg.ClientID,
 		clientSecret: cfg.ClientSecret,
 		staticBearer: strings.TrimSpace(cfg.StaticBearer),
 		http:         httpClient,
 		cache:        make(map[string]*cacheEntry),
 	}, nil
+}
+
+// zapMeshPort is the base ZAP transport port. KMS does not listen on it
+// (KMS is HTTP-only), so a zap:// endpoint that carries it has the port
+// dropped during normalization — the HTTP service answers on its own
+// port (80 in-cluster, implicit for https externally).
+const zapMeshPort = "9999"
+
+// NormalizeEndpoint turns any endpoint spelling the fleet uses into the
+// concrete HTTP base URL the bridge dials. It is the single seam where a
+// mesh-style `zap://` secret endpoint meets KMS's HTTP secrets API:
+//
+//   - ""                         → "" (IAM may be empty when StaticBearer set)
+//   - "zap://kms.hanzo.svc:9999" → "http://kms.hanzo.svc"   (scheme→http, ZAP port dropped)
+//   - "zap://kms.hanzo.svc"      → "http://kms.hanzo.svc"
+//   - "http://kms.hanzo.svc"     → unchanged
+//   - "https://kms.hanzo.ai"     → unchanged
+//   - "kms.hanzo.svc"            → "http://kms.hanzo.svc"   (bare host defaults to http)
+//
+// A trailing slash is always trimmed. KMS speaks no ZAP record protocol,
+// so we never dial :9999 for secrets — keeping the bogus port would just
+// hang every read.
+func NormalizeEndpoint(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	// Bare host (no scheme) → assume in-cluster HTTP.
+	if !strings.Contains(raw, "://") {
+		raw = "http://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("parse %q: %w", raw, err)
+	}
+	if u.Host == "" {
+		return "", fmt.Errorf("no host in %q", raw)
+	}
+	switch u.Scheme {
+	case "zap":
+		// Mesh-style endpoint. KMS answers over HTTP, never ZAP — rewrite
+		// the scheme and drop the ZAP mesh port so we hit the HTTP svc.
+		u.Scheme = "http"
+		if u.Port() == zapMeshPort {
+			u.Host = u.Hostname()
+		}
+	case "http", "https":
+		// Already an HTTP(S) base URL.
+	default:
+		return "", fmt.Errorf("unsupported scheme %q in %q (want zap, http, or https)", u.Scheme, raw)
+	}
+	return strings.TrimRight(u.String(), "/"), nil
 }
 
 // GetSecret fetches one secret value for (orgId, secretPath). secretPath
