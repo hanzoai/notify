@@ -18,6 +18,11 @@ type sesClient interface {
 		params *ses.SendEmailInput,
 		optFns ...func(options *ses.Options),
 	) (*ses.SendEmailOutput, error)
+	SendRawEmail(
+		ctx context.Context,
+		params *ses.SendRawEmailInput,
+		optFns ...func(options *ses.Options),
+	) (*ses.SendRawEmailOutput, error)
 }
 
 // Compile-time check to ensure that ses.Client implements the sesClient interface.
@@ -84,6 +89,32 @@ func (a AmazonSES) Send(ctx context.Context, subject, message string) error {
 	_, err := a.client.SendEmail(ctx, input)
 	if err != nil {
 		return fmt.Errorf("send mail using Amazon SES service: %w", err)
+	}
+
+	return nil
+}
+
+// SendRaw sends a pre-built raw MIME message via the SES SendRawEmail API.
+// Unlike Send (which uses the structured SendEmail API and cannot carry
+// arbitrary headers), the raw path lets the caller inject custom headers —
+// e.g. RFC 8058 List-Unsubscribe / List-Unsubscribe-Post for the marketing
+// chain. The message must already be a complete, standards-compliant MIME
+// document (headers + body); the SDK base64-encodes it for the wire.
+//
+// Source and Destinations are passed explicitly so the envelope sender and
+// recipients are authoritative even when they differ from the MIME headers.
+func (a AmazonSES) SendRaw(ctx context.Context, raw []byte) error {
+	input := &ses.SendRawEmailInput{
+		RawMessage: &types.RawMessage{
+			Data: raw,
+		},
+		Source:       a.senderAddress,
+		Destinations: a.receiverAddresses,
+	}
+
+	_, err := a.client.SendRawEmail(ctx, input)
+	if err != nil {
+		return fmt.Errorf("send raw mail using Amazon SES service: %w", err)
 	}
 
 	return nil
