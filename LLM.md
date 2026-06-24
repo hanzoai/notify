@@ -71,9 +71,17 @@ at the SQL filter level.
 shared/{service}/{key}                            # Hanzo subaccount (legacy DB-row path)
 tenants/{slug}/{service}/{key}                    # BYO per tenant (DB-row path)
 brand/{slug}/{provider}/{key-kebab}               # per-brand chain provider creds
-brand/hanzo/{provider}/{key-kebab}            # fleet default (fail-closed if missing)
+brand/hanzo/{provider}/{key-kebab}                # fleet default (fail-closed if missing)
 brand/{slug}/notify-chain/{channel}               # JSON array of provider ids — per-channel order override
 ```
+
+KMS is reached over its HTTP secrets API (`/v1/kms/orgs/{org}/secrets/...`).
+`internal/kmsbridge` is the ONE place that resolves a secret; its
+`NormalizeEndpoint` is the single seam that maps the fleet's mesh-style
+`zap://kms.hanzo.svc:9999` endpoint onto KMS's HTTP service (KMS has no
+ZAP listener, so the scheme becomes http and the :9999 mesh port is
+dropped). `KMS_ENDPOINT` may be given as `zap://`, `http://`, `https://`,
+or a bare host — all normalize to the same HTTP base URL.
 
 Three resolution paths:
 
@@ -96,9 +104,9 @@ Three resolution paths:
    absent → `DefaultChainFor(channel)`:
 
        sms             → plivo, twilio
-       email_txn       → ses_api, ses_smtp
-       email_otp       → ses_smtp, ses_api
-       email_marketing → sendgrid, ses_api
+       email_txn       → twilio_email
+       email_otp       → twilio_email
+       email_marketing → twilio_email, sendgrid
 
    Each provider's credentials are read from
    `brand/<slug>/<provider>/<key-kebab>` with brand→hanzo
@@ -112,8 +120,11 @@ Three resolution paths:
 Why three paths: caller-pinned (path 1) lets the platform UI probe
 exactly one provider; brand-Plivo UI (path 2) is a metadata surface
 for ops; chain (path 3) is the production send path. The chain
-defaults match the legacy "Plivo for SMS, SES for email" behavior
-but add automatic failover when the primary is down.
+defaults are "Plivo for SMS, Twilio-native for email" — email rides
+Twilio's Email API (`comms.twilio.com/v1/Emails`, Basic auth on the
+SAME account creds as Twilio SMS), with sendgrid the marketing-class
+fallback. SES was removed: one cloud (Twilio) backs both channels.
+The chain adds automatic failover when the primary is down.
 
 ## Send modes
 
@@ -179,8 +190,9 @@ never returns them.
 - **List-Unsubscribe headers** (`internal/marketing`): RFC 8058 +
   RFC 2369 header builder. `List-Unsubscribe: <https-url>, <mailto>`
   + `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. Per-send
-  token, 30-day expiry. Builder is decoupled from the send path so
-  callers can adopt it independently of the SES raw-MIME refactor.
+  token, 30-day expiry. Builder is decoupled from the send path; the
+  headers ride email via the chain's `RawSender` capability, which
+  `twilio_email` implements (Twilio's Email API carries a headers map).
 - **STOP keyword webhook** (`/v1/notify/sms-inbound`): one route
   accepts Plivo + Twilio (both providers post the same logical
   payload, just different field names). Matches

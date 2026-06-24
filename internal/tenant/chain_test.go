@@ -336,9 +336,9 @@ func TestCanonicalChannel(t *testing.T) {
 }
 
 // TestDefaultChainFor pins the default chain order. The list is part
-// of the wire contract with ops dashboards ("if you see SES SMTP
-// winning email_txn sends, SES API is having a bad day") — changes
-// land here on purpose.
+// of the wire contract with ops dashboards ("if you see sendgrid
+// winning email_marketing sends, Twilio Email is having a bad day") —
+// changes land here on purpose.
 func TestDefaultChainFor(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -346,9 +346,9 @@ func TestDefaultChainFor(t *testing.T) {
 		want []string
 	}{
 		{ChainSMS, []string{ProviderPlivo, ProviderTwilio}},
-		{ChainEmailTxn, []string{ProviderTwilioEmail, ProviderSESAPI, ProviderSESSMTP}},
-		{ChainEmailOTP, []string{ProviderTwilioEmail, ProviderSESSMTP, ProviderSESAPI}},
-		{ChainEmailMarketing, []string{ProviderSendGrid, ProviderSESAPI}},
+		{ChainEmailTxn, []string{ProviderTwilioEmail}},
+		{ChainEmailOTP, []string{ProviderTwilioEmail}},
+		{ChainEmailMarketing, []string{ProviderTwilioEmail, ProviderSendGrid}},
 		{"", nil},
 	}
 	for _, tt := range tests {
@@ -372,10 +372,10 @@ func TestKnownProvider(t *testing.T) {
 		ProviderPlivo:       true,
 		ProviderTwilio:      true,
 		ProviderTwilioEmail: true,
-		ProviderSESAPI:      true,
-		ProviderSESSMTP:     true,
 		ProviderSendGrid:    true,
 		"":                  false,
+		"ses_api":           false, // SES removed — email is Twilio-native
+		"ses_smtp":          false, // SES removed — email is Twilio-native
 		"mailgun":           false, // library has it but chain doesn't build it yet
 	}
 	for id, want := range want {
