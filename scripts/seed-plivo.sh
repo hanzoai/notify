@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Seed brand/liquidity/plivo/* in kms.hanzo.ai.
+# Seed brand/hanzo/plivo/* in kms.hanzo.ai.
 #
 # This is the fleet default every brand falls back to when it has not
 # wired its own Plivo override via the platform UI. Without these four
@@ -24,7 +24,7 @@
 
 set -euo pipefail
 
-ORG="${SEED_BRAND:-liquidity}"
+ORG="${SEED_BRAND:-hanzo}"
 
 if ! command -v kms >/dev/null; then
 	echo "kms: CLI not found on PATH. Build it from ~/work/hanzo/kms/cmd/kms or 'go install github.com/hanzoai/kms/cmd/kms@latest'." >&2
