@@ -71,7 +71,7 @@ at the SQL filter level.
 shared/{service}/{key}                            # Hanzo subaccount (legacy DB-row path)
 tenants/{slug}/{service}/{key}                    # BYO per tenant (DB-row path)
 brand/{slug}/{provider}/{key-kebab}               # per-brand chain provider creds
-brand/liquidity/{provider}/{key-kebab}            # fleet default (fail-closed if missing)
+brand/hanzo/{provider}/{key-kebab}                # fleet default (fail-closed if missing)
 brand/{slug}/notify-chain/{channel}               # JSON array of provider ids — per-channel order override
 ```
 
@@ -85,8 +85,8 @@ Three resolution paths:
 2. **Brand resolver** (`internal/tenant/plivo_resolver.go`) — used
    ONLY for the `/v1/notify/brand/plivo*` endpoints (platform UI's
    "current effective Plivo" indicator). Reads `brand/<slug>/plivo/*`
-   directly; on miss falls back to `brand/liquidity/plivo/*`.
-   Fail-closed if the Liquidity default is missing — no hard-coded
+   directly; on miss falls back to `brand/hanzo/plivo/*`.
+   Fail-closed if the default-brand record is missing — no hard-coded
    fallback.
 
 3. **Chain resolver** (`internal/tenant/chain.go`) — default send
@@ -101,7 +101,7 @@ Three resolution paths:
        email_marketing → sendgrid, ses_api
 
    Each provider's credentials are read from
-   `brand/<slug>/<provider>/<key-kebab>` with brand→liquidity
+   `brand/<slug>/<provider>/<key-kebab>` with brand→hanzo
    fallback on missing fields. Per-attempt deadline 10s, whole-chain
    ceiling 30s. Errors are classified terminal (4xx, invalid
    recipient, blocklist) or retryable (5xx, transport, timeout);
@@ -138,7 +138,7 @@ sync fallback — per hanzoai/tasks CONTRACT.md §3, production MUST set
 
 - Namespace: `default` (single shared worker for all tenants in this
   PR — per-org namespacing per CONTRACT.md §6 is the next step once
-  the `liquidity` tenant traffic scales).
+  the default tenant traffic scales).
 - Task queue: `notify-send`.
 - Workflow: `NotifySendWorkflow` (`internal/tasks/workflow.go`).
 - Activity: `Deliver` — idempotent on the message row's terminal

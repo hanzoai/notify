@@ -120,7 +120,7 @@ func ensureTenants(app core.App) error {
 		return nil
 	}
 	c := core.NewBaseCollection(Tenants)
-	// Tenant IDs are IAM org slugs (e.g. "hanzo", "liquidity") — the
+	// Tenant IDs are IAM org slugs (e.g. "hanzo", "zoo") — the
 	// default base 15-char min doesn't fit. Override the system id field.
 	c.Fields.Add(&core.TextField{
 		Name:       "id",

@@ -140,7 +140,7 @@ func TestToRouterPreferences(t *testing.T) {
 func goodWire() *Wire {
 	return &Wire{
 		UserID:                 "u1",
-		OrgID:                  "liquidity",
+		OrgID:                  "hanzo",
 		PrimaryEmail:           "u@example.com",
 		LegalEmail:             "u@example.com",
 		Timezone:               "America/New_York",

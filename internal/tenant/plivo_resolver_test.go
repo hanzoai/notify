@@ -87,23 +87,23 @@ func (r *fakePlivoResolver) fetchBrand(brand string) (*PlivoConfig, error) {
 	}, nil
 }
 
-// seedLiquidity returns a store pre-populated with the default brand.
-func seedLiquidity(t *testing.T) fakeKMSStore {
+// seedDefaultBrand returns a store pre-populated with the default brand.
+func seedDefaultBrand(t *testing.T) fakeKMSStore {
 	t.Helper()
 	s := fakeKMSStore{}
-	s.put(DefaultBrand, "brand/liquidity/plivo/auth-id", "LIQ-AUTH-ID")
-	s.put(DefaultBrand, "brand/liquidity/plivo/auth-token", "LIQ-AUTH-TOKEN")
-	s.put(DefaultBrand, "brand/liquidity/plivo/sender-id", "+15555555555")
-	s.put(DefaultBrand, "brand/liquidity/plivo/from-email", "noreply@")
+	s.put(DefaultBrand, "brand/hanzo/plivo/auth-id", "DEF-AUTH-ID")
+	s.put(DefaultBrand, "brand/hanzo/plivo/auth-token", "DEF-AUTH-TOKEN")
+	s.put(DefaultBrand, "brand/hanzo/plivo/sender-id", "+15555555555")
+	s.put(DefaultBrand, "brand/hanzo/plivo/from-email", "noreply@")
 	return s
 }
 
 // TestResolve_BrandOverride_UsesOverride: a brand with its own Plivo
-// keys in KMS sends from those keys, not the Liquidity defaults.
+// keys in KMS sends from those keys, not the default-brand defaults.
 func TestResolve_BrandOverride_UsesOverride(t *testing.T) {
 	t.Parallel()
 
-	s := seedLiquidity(t)
+	s := seedDefaultBrand(t)
 	s.put("hanzo", "brand/hanzo/plivo/auth-id", "HANZO-AUTH-ID")
 	s.put("hanzo", "brand/hanzo/plivo/auth-token", "HANZO-AUTH-TOKEN")
 	s.put("hanzo", "brand/hanzo/plivo/sender-id", "+14155551234")
@@ -119,7 +119,7 @@ func TestResolve_BrandOverride_UsesOverride(t *testing.T) {
 		t.Errorf("Brand = %q, want %q", cfg.Brand, "hanzo")
 	}
 	if cfg.AuthID != "HANZO-AUTH-ID" {
-		t.Errorf("AuthID = %q, want HANZO-AUTH-ID — fell back to Liquidity?", cfg.AuthID)
+		t.Errorf("AuthID = %q, want HANZO-AUTH-ID — fell back to default?", cfg.AuthID)
 	}
 	if cfg.SenderID != "+14155551234" {
 		t.Errorf("SenderID = %q, want +14155551234", cfg.SenderID)
@@ -129,12 +129,12 @@ func TestResolve_BrandOverride_UsesOverride(t *testing.T) {
 	}
 }
 
-// TestResolve_NoBrandOverride_FallsBackToLiquidity: a brand with no own
-// KMS rows transparently uses the Liquidity defaults.
-func TestResolve_NoBrandOverride_FallsBackToLiquidity(t *testing.T) {
+// TestResolve_NoBrandOverride_FallsBackToDefault: a brand with no own
+// KMS rows transparently uses the default-brand defaults.
+func TestResolve_NoBrandOverride_FallsBackToDefault(t *testing.T) {
 	t.Parallel()
 
-	s := seedLiquidity(t)
+	s := seedDefaultBrand(t)
 	r := &fakePlivoResolver{store: s}
 
 	cfg, err := r.ResolvePlivoConfig(context.Background(), "lux")
@@ -143,19 +143,19 @@ func TestResolve_NoBrandOverride_FallsBackToLiquidity(t *testing.T) {
 	}
 
 	if cfg.Brand != DefaultBrand {
-		t.Errorf("Brand = %q, want %q (fell back to Liquidity)", cfg.Brand, DefaultBrand)
+		t.Errorf("Brand = %q, want %q (fell back to default)", cfg.Brand, DefaultBrand)
 	}
-	if cfg.AuthID != "LIQ-AUTH-ID" {
-		t.Errorf("AuthID = %q, want LIQ-AUTH-ID", cfg.AuthID)
+	if cfg.AuthID != "DEF-AUTH-ID" {
+		t.Errorf("AuthID = %q, want DEF-AUTH-ID", cfg.AuthID)
 	}
 	if cfg.Override {
 		t.Errorf("Override = true, want false (no brand entries — used default)")
 	}
 }
 
-// TestResolve_LiquidityMissing_FailsClosed: with no Liquidity default
+// TestResolve_DefaultMissing_FailsClosed: with no default-brand record
 // in KMS, ResolvePlivoConfig refuses to invent a fallback.
-func TestResolve_LiquidityMissing_FailsClosed(t *testing.T) {
+func TestResolve_DefaultMissing_FailsClosed(t *testing.T) {
 	t.Parallel()
 
 	s := fakeKMSStore{} // nothing in KMS
@@ -176,7 +176,7 @@ func TestResolve_LiquidityMissing_FailsClosed(t *testing.T) {
 func TestResolve_EmptyBrand_Errors(t *testing.T) {
 	t.Parallel()
 
-	s := seedLiquidity(t)
+	s := seedDefaultBrand(t)
 	r := &fakePlivoResolver{store: s}
 
 	_, err := r.ResolvePlivoConfig(context.Background(), "")
@@ -188,13 +188,13 @@ func TestResolve_EmptyBrand_Errors(t *testing.T) {
 	}
 }
 
-// TestResolve_DefaultBrandRequest_UsesLiquidity: calling for "liquidity"
-// itself returns the Liquidity defaults; Override is true because the
-// caller's brand DOES match the resolved config's brand.
-func TestResolve_DefaultBrandRequest_UsesLiquidity(t *testing.T) {
+// TestResolve_DefaultBrandRequest_UsesDefault: calling for the default
+// brand itself returns the default-brand defaults; Override is true
+// because the caller's brand DOES match the resolved config's brand.
+func TestResolve_DefaultBrandRequest_UsesDefault(t *testing.T) {
 	t.Parallel()
 
-	s := seedLiquidity(t)
+	s := seedDefaultBrand(t)
 	r := &fakePlivoResolver{store: s}
 
 	cfg, err := r.ResolvePlivoConfig(context.Background(), DefaultBrand)
@@ -216,11 +216,11 @@ func TestResolve_DefaultBrandRequest_UsesLiquidity(t *testing.T) {
 // In the real PlivoResolver, the inner fetchBrand returns an error that
 // is NOT a "missing secret" — so the fallback short-circuits and the
 // caller sees the misconfig directly rather than silently dropping to
-// Liquidity defaults. We mirror that here.
+// the default-brand defaults. We mirror that here.
 func TestResolve_BrandIncomplete_DoesNotSilentlyFallBack(t *testing.T) {
 	t.Parallel()
 
-	s := seedLiquidity(t)
+	s := seedDefaultBrand(t)
 	// Only auth-id is set for hanzo — auth-token lookup will return
 	// "not found".
 	s.put("hanzo", "brand/hanzo/plivo/auth-id", "HANZO-AUTH-ID")
@@ -229,8 +229,8 @@ func TestResolve_BrandIncomplete_DoesNotSilentlyFallBack(t *testing.T) {
 	cfg, err := r.ResolvePlivoConfig(context.Background(), "hanzo")
 	// Behaviour: missing auth-token field on the brand path is a
 	// "secret not found" error per the fake KMS, so the brand-override
-	// path treats this as "no override exists" and falls back to
-	// Liquidity. That's the right choice — half a row is the same as
+	// path treats this as "no override exists" and falls back to the
+	// default brand. That's the right choice — half a row is the same as
 	// no row from the resolver's perspective; the platform UI is
 	// responsible for never writing a partial row in the first place.
 	if err != nil {
