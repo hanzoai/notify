@@ -19,6 +19,7 @@ import (
 	"github.com/hanzoai/base/plugins/platform"
 
 	"github.com/hanzoai/notify/internal/boot"
+	"github.com/hanzoai/notify/internal/kmsbridge"
 	"github.com/hanzoai/notify/internal/routes"
 	"github.com/hanzoai/notify/internal/schema"
 	"github.com/hanzoai/notify/internal/tasks"
@@ -29,11 +30,20 @@ import (
 func main() {
 	app := base.New()
 
+	// Resolve the KMS / IAM endpoints through the single normalization seam
+	// (kmsbridge.NormalizeEndpoint): the fleet hands secret endpoints as
+	// mesh-style `zap://kms.hanzo.svc:9999`, but KMS is an HTTP service, so
+	// notify routes every secret read to the HTTP API. Normalizing here too
+	// means the base platform plugin's own KMS helper sees the same HTTP
+	// endpoint as the kmsbridge — one endpoint, one way.
+	iamEndpoint := mustNormalize("IAM_ENDPOINT", envOr("IAM_ENDPOINT", "https://hanzo.id"))
+	kmsEndpoint := mustNormalize("KMS_ENDPOINT", envOr("KMS_ENDPOINT", "https://kms.hanzo.ai"))
+
 	// Platform plugin: IAM JWT validation, X-Org-Id injection, KMS
 	// helpers. Same registration shape as hanzoai/auto.
 	platform.MustRegister(app, platform.PlatformConfig{
-		IAMEndpoint:     envOr("IAM_ENDPOINT", "https://hanzo.id"),
-		KMSEndpoint:     envOr("KMS_ENDPOINT", "https://kms.hanzo.ai"),
+		IAMEndpoint:     iamEndpoint,
+		KMSEndpoint:     kmsEndpoint,
 		IAMClientID:     os.Getenv("IAM_CLIENT_ID"),
 		IAMClientSecret: os.Getenv("IAM_CLIENT_SECRET"),
 		IAMApp:          envOr("IAM_APP", "hanzo-notify"),
@@ -156,4 +166,15 @@ func envOr(k, d string) string {
 		return v
 	}
 	return d
+}
+
+// mustNormalize resolves an endpoint through kmsbridge.NormalizeEndpoint
+// and crashes loudly on a bad value — a malformed KMS/IAM endpoint is a
+// boot-time misconfiguration, not something to discover at first send.
+func mustNormalize(name, raw string) string {
+	v, err := kmsbridge.NormalizeEndpoint(raw)
+	if err != nil {
+		log.Fatalf("notifyd: %s: %v", name, err)
+	}
+	return v
 }

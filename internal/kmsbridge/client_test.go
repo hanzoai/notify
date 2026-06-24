@@ -292,6 +292,83 @@ func TestTokenRefresh_OnExpiry(t *testing.T) {
 	}
 }
 
+// TestNormalizeEndpoint locks the single seam where the fleet's mesh-style
+// `zap://` secret endpoint meets KMS's HTTP API. The headline case is the
+// exact value the deployment hands us today —
+// zap://kms.hanzo.svc.cluster.local:9999 — which MUST resolve to the KMS
+// HTTP service with the bogus ZAP port dropped, or every secret read hangs.
+func TestNormalizeEndpoint(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+		err  bool
+	}{
+		{"deployed zap with 9999", "zap://kms.hanzo.svc.cluster.local:9999", "http://kms.hanzo.svc.cluster.local", false},
+		{"zap no port", "zap://kms.hanzo.svc", "http://kms.hanzo.svc", false},
+		{"zap non-mesh port kept", "zap://kms.hanzo.svc:8080", "http://kms.hanzo.svc:8080", false},
+		{"http unchanged", "http://kms.hanzo.svc", "http://kms.hanzo.svc", false},
+		{"https unchanged", "https://kms.hanzo.ai", "https://kms.hanzo.ai", false},
+		{"https trailing slash trimmed", "https://kms.hanzo.ai/", "https://kms.hanzo.ai", false},
+		{"bare host defaults http", "kms.hanzo.svc", "http://kms.hanzo.svc", false},
+		{"empty stays empty", "", "", false},
+		{"unsupported scheme", "ftp://kms.hanzo.ai", "", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := NormalizeEndpoint(tc.in)
+			if tc.err {
+				if err == nil {
+					t.Fatalf("NormalizeEndpoint(%q) = %q, want error", tc.in, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("NormalizeEndpoint(%q) unexpected error: %v", tc.in, err)
+			}
+			if got != tc.want {
+				t.Errorf("NormalizeEndpoint(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestNew_NormalizesZapEndpoint proves New() routes a zap:// KMS endpoint
+// to the HTTP secrets API end-to-end: a secret read lands on the HTTP mock
+// despite the zap:// scheme in config.
+func TestNew_NormalizesZapEndpoint(t *testing.T) {
+	var hits int32
+	kms := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		if r.URL.Path != "/v1/kms/orgs/hanzo/secrets/brand/hanzo/twilio/auth-token" {
+			t.Errorf("path = %q, want canonical secrets route", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"value":"TW-TOKEN"}`))
+	}))
+	defer kms.Close()
+
+	// Rewrite the test server's http:// URL as zap://host:9999 to mimic the
+	// deployed endpoint; NormalizeEndpoint must steer it back to http://host.
+	host := strings.TrimPrefix(kms.URL, "http://")
+	c, err := New(Config{
+		KMSEndpoint:  "zap://" + host, // host already carries the test port
+		StaticBearer: "tok",
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	val, err := c.GetSecret("hanzo", "brand/hanzo/twilio/auth-token")
+	if err != nil {
+		t.Fatalf("GetSecret: %v", err)
+	}
+	if val != "TW-TOKEN" {
+		t.Errorf("value = %q, want TW-TOKEN", val)
+	}
+	if got := atomic.LoadInt32(&hits); got != 1 {
+		t.Errorf("kms hits = %d, want 1", got)
+	}
+}
+
 // Compile-time guard: ensure the time import stays used in case we
 // remove a test that touches it.
 var _ = time.Second
