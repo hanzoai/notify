@@ -29,6 +29,7 @@ import (
 	"github.com/hanzoai/notify/pkg/types"
 	"github.com/hanzoai/notify/service/mail"
 	"github.com/hanzoai/notify/service/plivo"
+	"github.com/hanzoai/notify/service/twilio"
 	"github.com/hanzoai/notify/service/twilioemail"
 )
 
@@ -250,6 +251,17 @@ func constructProvider(service string, c Credentials, to []string) (notify.Notif
 		// move to a TLS-only path notices the package).
 		_ = smtp.PlainAuth
 		return m, nil
+
+	case "twilio":
+		if c["account-sid"] == "" || c["auth-token"] == "" || c["from-number"] == "" {
+			return nil, errors.New("tenant: twilio requires account-sid, auth-token and from-number")
+		}
+		t, err := twilio.New(c["account-sid"], c["auth-token"], c["from-number"])
+		if err != nil {
+			return nil, err
+		}
+		t.AddReceivers(to...)
+		return t, nil
 
 	case "twilio_email":
 		if c["account-sid"] == "" || c["auth-token"] == "" || c["from-email"] == "" {
