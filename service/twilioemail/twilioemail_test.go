@@ -123,3 +123,43 @@ func TestService_Send_NoReceiversNoop(t *testing.T) {
 	s.baseURL = "http://127.0.0.1:0/should-not-be-called"
 	require.NoError(t, s.Send(context.Background(), "Subject", "body"))
 }
+
+// TestService_SendWithHeaders_CarriesRFC8058 proves the RFC 8058
+// List-Unsubscribe / List-Unsubscribe-Post pair reaches the Twilio Emails
+// request body via the headers map — the marketing chain's RawSender path.
+func TestService_SendWithHeaders_CarriesRFC8058(t *testing.T) {
+	t.Parallel()
+
+	srv, got := newFakeTwilio(t, http.StatusOK)
+
+	s := New("AC_fake_sid", "fake_token", "no-reply@send.hanzo.ai", "Hanzo")
+	s.baseURL = srv.URL + "/v1/Emails"
+	s.client = srv.Client()
+	s.AddReceivers("alice@example.com")
+
+	headers := map[string]string{
+		"List-Unsubscribe":      "<https://hanzo.ai/u/abc>, <mailto:unsub@hanzo.ai>",
+		"List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+	}
+	require.NoError(t, s.SendWithHeaders(context.Background(), "Promo", "<b>deal</b>", headers))
+
+	require.Len(t, got.body.Headers, 2)
+	assert.Equal(t, "<https://hanzo.ai/u/abc>, <mailto:unsub@hanzo.ai>", got.body.Headers["List-Unsubscribe"])
+	assert.Equal(t, "List-Unsubscribe=One-Click", got.body.Headers["List-Unsubscribe-Post"])
+}
+
+// TestService_Send_OmitsHeaders proves the plain Send path produces no
+// headers field — byte-identical to the pre-RawSender body.
+func TestService_Send_OmitsHeaders(t *testing.T) {
+	t.Parallel()
+
+	srv, got := newFakeTwilio(t, http.StatusOK)
+
+	s := New("AC_fake_sid", "fake_token", "no-reply@send.hanzo.ai", "Hanzo")
+	s.baseURL = srv.URL + "/v1/Emails"
+	s.client = srv.Client()
+	s.AddReceivers("alice@example.com")
+
+	require.NoError(t, s.Send(context.Background(), "Subject", "body"))
+	assert.Empty(t, got.body.Headers)
+}

@@ -91,8 +91,8 @@ func (r *fakePlivoResolver) fetchBrand(brand string) (*PlivoConfig, error) {
 func seedHanzo(t *testing.T) fakeKMSStore {
 	t.Helper()
 	s := fakeKMSStore{}
-	s.put(DefaultBrand, "brand/hanzo/plivo/auth-id", "LIQ-AUTH-ID")
-	s.put(DefaultBrand, "brand/hanzo/plivo/auth-token", "LIQ-AUTH-TOKEN")
+	s.put(DefaultBrand, "brand/hanzo/plivo/auth-id", "HANZO-DEFAULT-AUTH-ID")
+	s.put(DefaultBrand, "brand/hanzo/plivo/auth-token", "HANZO-DEFAULT-AUTH-TOKEN")
 	s.put(DefaultBrand, "brand/hanzo/plivo/sender-id", "+15555555555")
 	s.put(DefaultBrand, "brand/hanzo/plivo/from-email", "noreply@")
 	return s
@@ -145,8 +145,8 @@ func TestResolve_NoBrandOverride_FallsBackToHanzo(t *testing.T) {
 	if cfg.Brand != DefaultBrand {
 		t.Errorf("Brand = %q, want %q (fell back to Hanzo)", cfg.Brand, DefaultBrand)
 	}
-	if cfg.AuthID != "LIQ-AUTH-ID" {
-		t.Errorf("AuthID = %q, want LIQ-AUTH-ID", cfg.AuthID)
+	if cfg.AuthID != "HANZO-DEFAULT-AUTH-ID" {
+		t.Errorf("AuthID = %q, want HANZO-DEFAULT-AUTH-ID", cfg.AuthID)
 	}
 	if cfg.Override {
 		t.Errorf("Override = true, want false (no brand entries — used default)")
