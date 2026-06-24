@@ -130,8 +130,8 @@ func (r *Resolver) fetchCreds(_ context.Context, row *core.Record) (Credentials,
 }
 
 // credsFromEnv reads provider creds from env vars. Only the providers
-// likely to be used standalone (plivo + mail) have env fallbacks; the
-// rest hard-require KMS.
+// likely to be used standalone (plivo, twilio, twilio_email, mail) have
+// env fallbacks; the rest hard-require KMS.
 func credsFromEnv(service string) Credentials {
 	switch service {
 	case "plivo":
@@ -139,6 +139,24 @@ func credsFromEnv(service string) Credentials {
 			"auth-id":     os.Getenv("PLIVO_AUTH_ID"),
 			"auth-token":  os.Getenv("PLIVO_AUTH_TOKEN"),
 			"from-number": os.Getenv("PLIVO_FROM_NUMBER"),
+		}
+	case "twilio":
+		// Twilio SMS. TWILIO_PHONE_NUMBER is the canonical env name on the
+		// k8s notify-twilio secret; TWILIO_FROM_NUMBER is accepted as an
+		// alias so either spelling works.
+		return Credentials{
+			"account-sid": os.Getenv("TWILIO_ACCOUNT_SID"),
+			"auth-token":  os.Getenv("TWILIO_AUTH_TOKEN"),
+			"from-number": envFirst("TWILIO_PHONE_NUMBER", "TWILIO_FROM_NUMBER"),
+		}
+	case "twilio_email":
+		// Twilio native Email API: same account creds as SMS + a verified
+		// from-email. TWILIO_FROM_EMAIL is the verified sender address.
+		return Credentials{
+			"account-sid": os.Getenv("TWILIO_ACCOUNT_SID"),
+			"auth-token":  os.Getenv("TWILIO_AUTH_TOKEN"),
+			"from-email":  os.Getenv("TWILIO_FROM_EMAIL"),
+			"from-name":   os.Getenv("TWILIO_FROM_NAME"),
 		}
 	case "mail":
 		return Credentials{
@@ -151,6 +169,17 @@ func credsFromEnv(service string) Credentials {
 		}
 	}
 	return Credentials{}
+}
+
+// envFirst returns the value of the first set (non-empty) env var in keys,
+// or "" when none are set. Lets a canonical and an alias name both work.
+func envFirst(keys ...string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // credKeysForService returns the list of secret keys that must be

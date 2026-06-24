@@ -212,6 +212,17 @@ type ChainProvider interface {
 	Send(ctx context.Context, subject, body string, to string) error
 }
 
+// RawSender is the optional capability a ChainProvider advertises when it
+// can attach caller-supplied MIME headers to an email — the RFC 8058
+// List-Unsubscribe / List-Unsubscribe-Post pair the marketing path needs.
+// The plain Send surface cannot inject headers, so the marketing sender
+// type-asserts to RawSender and falls back to Send when a provider does
+// not implement it. SES (via SendRawEmail) is the implementer today.
+type RawSender interface {
+	ChainProvider
+	SendRaw(ctx context.Context, subject, body, to string, headers map[string]string) error
+}
+
 // Run walks the chain. It returns the winning provider id and the
 // telemetry trace. If every provider fails it returns ErrChainExhausted
 // with the trace attached.
@@ -811,6 +822,13 @@ func (p *sesAPIChainProvider) ID() string { return ProviderSESAPI }
 func (p *sesAPIChainProvider) Send(ctx context.Context, subject, body, to string) error {
 	p.svc.AddReceivers(to)
 	return p.svc.Send(ctx, subject, body)
+}
+
+// SendRaw satisfies RawSender: it routes through SES SendRawEmail so the
+// List-Unsubscribe headers ride along on the marketing path.
+func (p *sesAPIChainProvider) SendRaw(ctx context.Context, subject, body, to string, headers map[string]string) error {
+	p.svc.AddReceivers(to)
+	return p.svc.SendRaw(ctx, subject, body, headers)
 }
 
 type sesSMTPChainProvider struct {
