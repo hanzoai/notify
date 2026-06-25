@@ -330,6 +330,8 @@ github.com/kevinburke/twilio-go v0.0.0-20240716172313-813590983ccc h1:cDRzcR6IuX
 github.com/kevinburke/twilio-go v0.0.0-20240716172313-813590983ccc/go.mod h1:G52lJ9gSqbkLzwqB9e3sBJ/nhvYswVIqwZcTw4NiXdY=
 github.com/klauspost/compress v1.18.5 h1:/h1gH5Ce+VWNLSWqPzOVn6XBO+vJbCNGvjoaGBFW2IE=
 github.com/klauspost/compress v1.18.5/go.mod h1:cwPg85FWrGar70rWktvGQj8/hthj3wpl0PGDogxkrSQ=
+github.com/klauspost/compress v1.18.6 h1:2jupLlAwFm95+YDR+NwD2MEfFO9d4z4Prjl1XXDjuao=
+github.com/klauspost/compress v1.18.6/go.mod h1:cwPg85FWrGar70rWktvGQj8/hthj3wpl0PGDogxkrSQ=
 github.com/klauspost/cpuid/v2 v2.0.1/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
 github.com/klauspost/cpuid/v2 v2.3.0 h1:S4CRMLnYUhGeDFDqkGriYKdfoFlDnMtqTiI/sFzhA9Y=
 github.com/klauspost/cpuid/v2 v2.3.0/go.mod h1:hqwkgyIinND0mEev00jJYCxPNVRVXFQeu1XKlok6oO0=
@@ -370,6 +372,8 @@ github.com/luxfi/crypto/ipa v1.2.4 h1:6xfwhI9/HrcDkF3Ti5/NxsNQIWbwYDJmRSNIHRQ/xf
 github.com/luxfi/crypto/ipa v1.2.4/go.mod h1:43J6f6rcfUMrZt4cQectMOZb6Ps+fAEj8ZTPC3Kk+gE=
 github.com/luxfi/database v1.18.2 h1:r7jU8s4jaN0NpzWB0x91yyaL4CoCe0SxWEvxJGhJ7rE=
 github.com/luxfi/database v1.18.2/go.mod h1:PW0oGujt165mYg7j/lctVbnfsUW6QLfIAgjyQdS66SM=
+github.com/luxfi/database v1.19.3 h1:flss7/VSGf29l1yZvPwazbtp87X5qfnZGPCU5ObqttQ=
+github.com/luxfi/database v1.19.3/go.mod h1:S/LvmfzNYWVNslcEcZwDrntqUO2ksaL8ql1nRmLUA/Q=
 github.com/luxfi/fhe v1.7.9/go.mod h1:Pmt8Wy1zPTYbtOuOCUdXa0lw4vDMuSKBV/pgGRlLWF4=
 github.com/luxfi/geth v1.16.73 h1:jbRaWQDXTadZ+fEh5Cd5jnkv1qq4yAoT5bVQFuql8ZU=
 github.com/luxfi/geth v1.16.73/go.mod h1:CPzps7Zp3I7Og3KT3m+Qs41WW8z+YPGx1TOJQnHdBHY=
@@ -381,6 +385,8 @@ github.com/luxfi/log v1.4.3 h1:xkUKRWvQ4ZwvlUC2e0/RTtHYZOYSMvSQ9W9lbjwBmiI=
 github.com/luxfi/log v1.4.3/go.mod h1:myIkufyiQomSQH34K981kbz6cG4WUoerRUh7F4XhlQI=
 github.com/luxfi/math v1.2.4 h1:iVz7s0gToCNUU/2cLT8gUa8MLzc0YRp4jBmeXBeKdXk=
 github.com/luxfi/math v1.2.4/go.mod h1:i+Am9YvFsqDE75ZW8MPE62XCXGukXNiN/7mD9SKxxZY=
+github.com/luxfi/math v1.4.0 h1:/sb7Grw3hfO+5INWAWdB95jTvCeXg8fSQxsxDzcFtd4=
+github.com/luxfi/math v1.4.0/go.mod h1:iW0FOCC8qF2mPE+MakG780CAHA83848lb1L04thA1Pg=
 github.com/luxfi/math/big v0.1.0 h1:Vz4c0RsZVPdIKPsHPgAJChH/R3p15WHRUz7LkLf+NIQ=
 github.com/luxfi/math/big v0.1.0/go.mod h1:BuxSu22RbO93xBLk5Eam5nldFponoJ73xDFz4uJ3Huk=
 github.com/luxfi/mdns v0.1.0 h1:VB3mQcETc9j5SY1S6lAgFtuGr/rjWuDgPYnxS+OKWMQ=
