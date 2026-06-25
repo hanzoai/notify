@@ -1,6 +1,6 @@
 module github.com/hanzoai/notify
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/hanzoai/base v1.3.0
@@ -122,7 +122,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.9.1 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/klauspost/compress v1.18.5 // indirect
+	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
@@ -137,12 +137,12 @@ require (
 	github.com/luxfi/container v0.0.4 // indirect
 	github.com/luxfi/crypto v1.19.0 // indirect
 	github.com/luxfi/crypto/ipa v1.2.4 // indirect
-	github.com/luxfi/database v1.18.2 // indirect
+	github.com/luxfi/database v1.19.3 // indirect
 	github.com/luxfi/fhe v1.7.9 // indirect
 	github.com/luxfi/geth v1.16.73 // indirect
 	github.com/luxfi/ids v1.2.9 // indirect
 	github.com/luxfi/lattice/v7 v7.0.0 // indirect
-	github.com/luxfi/math v1.2.4 // indirect
+	github.com/luxfi/math v1.4.0 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
 	github.com/luxfi/mdns v0.1.0 // indirect
 	github.com/luxfi/metric v1.5.1 // indirect
