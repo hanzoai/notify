@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="notify" width="880"></p>
+
 <div align="center">
 <img
     width=40%
