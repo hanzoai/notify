@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"strings"
@@ -53,30 +54,32 @@ type Service struct {
 
 // emailRequest is the JSON body POSTed to POST /v1/Emails.
 //
-// SCHEMA ASSUMPTION: Twilio's native Emails API is JSON over HTTP Basic,
-// but the exact field names of the request body are not pinned in this
-// codebase. This struct implements the most standard transactional-email
-// shape (from / to / subject / text+html bodies). It is isolated here so
-// that if Twilio's published schema uses different field names it is a
-// one-struct, one-line-per-field fix with NO change to Service/Send.
+// Schema verified against the live comms.twilio.com/v1/Emails API
+// (2026-06): a recipient/sender is {address,name}; subject + body live
+// under a nested content object. The API returns 202 with
+// {"operationId","operationLocation"} on accept.
 type emailRequest struct {
 	From    emailAddress   `json:"from"`
 	To      []emailAddress `json:"to"`
-	Subject string         `json:"subject"`
-	// Exactly one of Text/HTML is populated per send (HTML by default).
-	Text string `json:"text,omitempty"`
-	HTML string `json:"html,omitempty"`
-	// Headers carries caller-supplied MIME headers (e.g. the RFC 8058
-	// List-Unsubscribe / List-Unsubscribe-Post pair). Omitted when empty
-	// so the structured Send path produces an identical body to before.
-	Headers map[string]string `json:"headers,omitempty"`
+	Content emailContent   `json:"content"`
 }
 
-// emailAddress is the {email,name} pair used for both sender and
+// emailAddress is the {address,name} pair used for both sender and
 // recipients. name is omitted when empty.
 type emailAddress struct {
-	Email string `json:"email"`
-	Name  string `json:"name,omitempty"`
+	Address string `json:"address"`
+	Name    string `json:"name,omitempty"`
+}
+
+// emailContent is the nested content object. The API REQUIRES a non-empty
+// html part; text is an optional additional plain part; headers carries
+// caller-supplied MIME headers (the RFC 8058 List-Unsubscribe /
+// List-Unsubscribe-Post pair) and nests here, not at the top level.
+type emailContent struct {
+	Subject string            `json:"subject"`
+	HTML    string            `json:"html"`
+	Text    string            `json:"text,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
 }
 
 // New returns a new Twilio Email provider. accountSID + authToken are the
@@ -138,21 +141,25 @@ func (s *Service) send(ctx context.Context, subject, message string, headers map
 		return nil
 	}
 
-	reqBody := emailRequest{
-		From:    emailAddress{Email: s.senderAddress, Name: s.senderName},
-		To:      make([]emailAddress, 0, len(s.receiverAddresses)),
-		Subject: subject,
-	}
-	for _, addr := range s.receiverAddresses {
-		reqBody.To = append(reqBody.To, emailAddress{Email: addr})
-	}
+	content := emailContent{Subject: subject}
 	if s.usePlainText {
-		reqBody.Text = message
+		// Twilio's Email API requires a non-empty html part, so carry the
+		// plain text in both: text/plain plus an HTML-escaped copy.
+		content.Text = message
+		content.HTML = "<pre>" + html.EscapeString(message) + "</pre>"
 	} else {
-		reqBody.HTML = message
+		content.HTML = message
 	}
 	if len(headers) > 0 {
-		reqBody.Headers = headers
+		content.Headers = headers
+	}
+	reqBody := emailRequest{
+		From:    emailAddress{Address: s.senderAddress, Name: s.senderName},
+		To:      make([]emailAddress, 0, len(s.receiverAddresses)),
+		Content: content,
+	}
+	for _, addr := range s.receiverAddresses {
+		reqBody.To = append(reqBody.To, emailAddress{Address: addr})
 	}
 
 	payload, err := json.Marshal(reqBody)
