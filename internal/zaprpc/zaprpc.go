@@ -22,3 +22,19 @@ const (
 	ProcedureEvents        = "notify.Events"
 	ProcedureMetering      = "notify.Metering"
 )
+
+// Cognitive (cog.*) procedures follow HIP-0114 §"Reference Implementation"
+// (ZAP Inter-VM Cognitive Transport). They carry intents, receipts, and
+// agent/operator artifacts between the C-role sidecar, A-Chain runtime,
+// and signer firewall. ZAP is transport only — none of these procedures
+// is a consensus input on its own; certification is by committed outbox
+// entries, Merkle proofs against `receipt_root`, or signer policy.
+const (
+	ProcedureCogSubmitIntent   = "cog.SubmitIntent"
+	ProcedureCogDeliverReceipt = "cog.DeliverReceipt"
+	ProcedureCogAgentArtifact  = "cog.AgentArtifact"
+	ProcedureCogOperatorAction = "cog.OperatorAction"
+	ProcedureCogBridgeHealth   = "cog.BridgeHealth"
+	ProcedureCogSimRequest     = "cog.SimRequest"
+	ProcedureCogSimResult      = "cog.SimResult"
+)
