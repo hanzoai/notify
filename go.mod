@@ -127,7 +127,7 @@ require (
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/luxfi/accel v1.0.7 // indirect
-	github.com/luxfi/age v1.5.0 // indirect
+	github.com/luxfi/age v1.5.1 // indirect
 	github.com/luxfi/cache v1.2.1 // indirect
 	github.com/luxfi/codec v1.1.3 // indirect
 	github.com/luxfi/compress v0.0.5 // indirect
