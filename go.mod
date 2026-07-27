@@ -188,7 +188,7 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
-	github.com/zap-proto/zip v1.6.0 // indirect
+	github.com/zap-proto/zip v1.10.1 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.mau.fi/util v0.8.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
