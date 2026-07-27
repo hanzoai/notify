@@ -1,6 +1,6 @@
 module github.com/hanzoai/notify
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/hanzoai/base v1.5.8
