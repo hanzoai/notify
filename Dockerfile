@@ -10,7 +10,7 @@
 # no `apk add` against dl-cdn.alpinelinux.org which the hanzo home-lab
 # runner can't reach reliably. Adds ~50MB to the build layer (discarded
 # at the FROM scratch hand-off so the final image is unaffected).
-FROM golang:1.26.4 AS build
+FROM golang:1.26.5 AS build
 WORKDIR /src
 
 # GOPROXY=direct: every hanzo/lux/zoo module lives on github.com,
