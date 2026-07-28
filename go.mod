@@ -266,3 +266,5 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+exclude github.com/luxfi/genesis v1.5.21
