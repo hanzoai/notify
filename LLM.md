@@ -231,7 +231,7 @@ async path returns 503 until `TASKS_ADDR` is set.
 
 ## Tags / versioning
 
-- `v1.0.0` — pre-rename casdoor lineage (historical).
-- `v1.6.x` — Hanzo rebrand on top of casdoor/notify2 import path.
+- `v1.0.0` — pre-rename lineage (historical).
+- `v1.6.x` — Hanzo rebrand, still on the pre-rename import path.
 - `v1.7.0+` — `github.com/hanzoai/notify` canonical module path.
 - `v1.1.0-pre*` — service scaffold (notifyd + internal/ + pkg/).
