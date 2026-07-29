@@ -50,8 +50,8 @@ func New(app core.App, kms *kmsbridge.Client) *Resolver {
 // Resolve returns a notifier wired with credentials for (tenant, channel).
 // service may be empty to take the tenant's default provider for the
 // channel. The returned notifier targets `to` so caller can call Send
-// directly — providers in the library are constructed with a fixed
-// recipient list per the casdoor/nikoksr design.
+// directly — every provider binds its recipient list at construction
+// (AddReceivers), not per-Send.
 func (r *Resolver) Resolve(ctx context.Context, tenant, channel, service string, to []string) (notify.Notifier, string, error) {
 	row, err := r.selectProvider(tenant, channel, service)
 	if err != nil {

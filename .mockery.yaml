@@ -2,7 +2,7 @@ with-expecter: true
 mockname: "mock{{.InterfaceName}}"
 filename: "mock_{{.InterfaceName | snakecase}}.go"
 packages:
-  github.com/casdoor/notify2:
+  github.com/hanzoai/notify:
     config:
       dir: "{{.InterfaceDir}}"
       inpackage: true
