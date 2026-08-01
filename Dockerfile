@@ -30,7 +30,11 @@ ENV GOSUMDB=off
 # entry that rewrites every github.com URL to x-access-token://… form
 # the token authenticates against. The secret is mount-only — never
 # baked into a layer.
-ENV GOPRIVATE=github.com/hanzoai/*,github.com/lux-private/*,github.com//*
+# `github.com//*` was here — an empty org between the slashes. No module path
+# can ever match it, so it selected nothing and silently did nothing; it reads
+# like a third private org is covered when none is. Almost certainly a
+# find-replace that deleted an org name and left the delimiters.
+ENV GOPRIVATE=github.com/hanzoai/*,github.com/lux-private/*
 
 RUN groupadd -g 65532 nonroot && \
     useradd  -u 65532 -g 65532 -M -s /usr/sbin/nologin nonroot
