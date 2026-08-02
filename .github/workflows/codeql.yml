@@ -22,6 +22,16 @@ on:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    # CodeQL needs GitHub's code-scanning API, which git.hanzo.ai does not serve.
+    # Measured against the forge:
+    #     GET /v1/repos/<o>/<r>/code-scanning/analyses -> 404
+    #     GET /v1/repos/<o>/<r>/code-scanning/sarifs   -> 404
+    #     GET /v1/repos/<o>/<r>/releases               -> 200
+    # so `Initialize CodeQL` dies on a bare `404 page not found` with nothing to
+    # fix in this repo. Skipping there rather than failing: a job that CANNOT
+    # work should not report red every push, and the gap is named here rather
+    # than hidden — this repo currently gets no code scanning anywhere.
+    if: github.server_url == 'https://github.com'
     # Runner size impacts CodeQL analysis time. To learn more, please see:
     #   - https://gh.io/recommended-hardware-resources-for-running-codeql
     #   - https://gh.io/supported-runners-and-hardware-resources
