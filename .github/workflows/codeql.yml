@@ -27,7 +27,14 @@ jobs:
     #   - https://gh.io/supported-runners-and-hardware-resources
     #   - https://gh.io/using-larger-runners (GitHub.com only)
     # Consider using larger runners or machines with greater resources for possible analysis time improvements.
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    # hanzo-build-linux-amd64, not the stock expression. GitHub's CodeQL
+    # template resolves this to `ubuntu-latest` for every non-swift language,
+    # and this fleet deliberately advertises no generic ubuntu-* label — ~1400
+    # mirrored upstream forks all ask for it. An unmatched label is not an
+    # error here, it is silence: this job sat `queued` for hours and the run
+    # before it was cancelled at the 24h timeout, so CodeQL has never analysed
+    # this repo.
+    runs-on: hanzo-build-linux-amd64
     timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
     permissions:
       # required for all workflows
