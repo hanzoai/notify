@@ -26,8 +26,7 @@ and follows the `hanzoai/auto` layout exactly — same `hanzoai/base` +
 │   ├── template/           lifecycle + Go text/template rendering
 │   ├── event/              event catalog routing
 │   ├── metering/           per-send ledger + aggregation
-│   ├── tasks/              hanzoai/tasks workflow + activity for async sends
-│   └── zaprpc/             procedure constants (server impl land later)
+│   └── tasks/              hanzoai/tasks workflow + activity for async sends
 └── pkg/                    public consumer SDK
     ├── client/             HTTP client → notifyd
     └── types/              wire shapes shared by routes + client
