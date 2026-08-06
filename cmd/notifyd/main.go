@@ -30,20 +30,20 @@ import (
 func main() {
 	app := base.New()
 
-	// Resolve the KMS / IAM endpoints through the single normalization seam
-	// (kmsbridge.NormalizeEndpoint): the fleet hands secret endpoints as
-	// mesh-style `zap://kms.hanzo.svc:9999`, but KMS is an HTTP service, so
-	// notify routes every secret read to the HTTP API. Normalizing here too
-	// means the base platform plugin's own KMS helper sees the same HTTP
-	// endpoint as the kmsbridge — one endpoint, one way.
+	// IAM is an HTTP service, so its endpoint still goes through the
+	// normalization seam (kmsbridge.NormalizeEndpoint).
 	iamEndpoint := mustNormalize("IAM_ENDPOINT", envOr("IAM_ENDPOINT", "https://hanzo.id"))
-	kmsEndpoint := mustNormalize("KMS_ENDPOINT", envOr("KMS_ENDPOINT", "https://kms.hanzo.ai"))
 
 	// Platform plugin: IAM JWT validation, X-Org-Id injection, KMS
 	// helpers. Same registration shape as hanzoai/auto.
+	//
+	// KMSEndpoint is deliberately left unset. Base speaks native ZAP to
+	// luxfi/kms and rejects an http(s) endpoint outright, while notify's own
+	// kmsbridge speaks HTTP — so the normalized HTTP endpoint that the rest of
+	// this process uses is exactly what must NOT be handed to base. Unset,
+	// base uses its own in-cluster ZAP default.
 	platform.MustRegister(app, platform.PlatformConfig{
 		IAMEndpoint:     iamEndpoint,
-		KMSEndpoint:     kmsEndpoint,
 		IAMClientID:     os.Getenv("IAM_CLIENT_ID"),
 		IAMClientSecret: os.Getenv("IAM_CLIENT_SECRET"),
 		IAMApp:          envOr("IAM_APP", "hanzo-notify"),
