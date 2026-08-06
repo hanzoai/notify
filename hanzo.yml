@@ -1,0 +1,22 @@
+# hanzoai/notify — the multi-channel notification library/service (Go).
+#
+# Gate only, no `images:`. The image and the GitHub release are already cut by
+# .github/workflows/release.yml (semantic-release + goreleaser) from a tag;
+# declaring a second producer here would put two lanes behind one artifact name
+# and neither would be authoritative.
+#
+# This is the repo's `make test` inlined — build the whole tree, then the suite
+# with -failfast -race. Written out rather than shelling to make because
+# hanzo.yml is read by the runner and by platform.hanzo.ai and neither is
+# promised a make binary.
+#
+# -race matters for this repo specifically: Notify fans a single Send out to
+# every registered service concurrently and collects errors, so the fan-out is
+# the product. A race there drops or duplicates a notification, which no
+# assertion about the return value can see.
+test:
+  - name: build-and-test
+    run: |
+      set -e
+      go build ./...
+      go test -failfast -race -count=1 -timeout=10m ./...
