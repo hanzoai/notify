@@ -3,7 +3,7 @@ module github.com/hanzoai/notify
 go 1.26.5
 
 require (
-	github.com/hanzoai/base v1.5.16
+	github.com/hanzoai/base v1.5.18
 	github.com/hanzoai/dbx v1.17.2
 	github.com/hanzoai/tasks v1.52.9
 	github.com/luxfi/log v1.5.0
@@ -112,12 +112,15 @@ require (
 	github.com/gtank/ristretto255 v0.2.0 // indirect
 	github.com/hanzoai/authz v1.10.29 // indirect
 	github.com/hanzoai/cek v0.2.3 // indirect
-	github.com/hanzoai/csqlite v0.1.0 // indirect
+	github.com/hanzoai/csqlite v0.1.2 // indirect
 	github.com/hanzoai/namespace v1.2.0 // indirect
 	github.com/hanzoai/orm v0.6.16 // indirect
 	github.com/hanzoai/pubsub-go v1.0.0 // indirect
 	github.com/hanzoai/sqlcipher v0.1.1 // indirect
-	github.com/hanzoai/sqlite v0.5.0 // indirect
+	github.com/hanzoai/sqlite v0.5.2 // indirect
+	github.com/hanzos3/crc64nvme v1.1.2 // indirect
+	github.com/hanzos3/go v1.0.1 // indirect
+	github.com/hanzos3/md5-simd v1.1.3 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -169,9 +172,6 @@ require (
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
-	github.com/minio/crc64nvme v1.1.1 // indirect
-	github.com/minio/md5-simd v1.1.2 // indirect
-	github.com/minio/minio-go/v7 v7.0.100 // indirect
 	github.com/montanaflynn/stats v0.9.0 // indirect
 	github.com/mr-tron/base58 v1.3.0 // indirect
 	github.com/nats-io/nkeys v0.4.15 // indirect
