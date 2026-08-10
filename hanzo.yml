@@ -14,9 +14,22 @@
 # every registered service concurrently and collects errors, so the fan-out is
 # the product. A race there drops or duplicates a notification, which no
 # assertion about the return value can see.
+#
+# The suite runs in two parts, and the split is the race detector: it needs cgo,
+# and the two packages that start a Base app cannot run under cgo. Base refuses
+# a SQLite without math functions ("no such function: acos") and the cgo build
+# has none, which is why a single -race run over ./... fails 30-odd route and
+# task tests that have nothing to do with concurrency.
+#
+# So each half runs the way it can: the race detector over everything it can
+# reach — which is where the fan-out lives — and the two Base-backed packages
+# with CGO_ENABLED=0, exactly how the Dockerfile builds the shipping binary.
+# No build tag: a tagged cgo SQLite would be a third build that nothing ships.
 test:
   - name: build-and-test
     run: |
       set -e
       go build ./...
-      go test -failfast -race -count=1 -timeout=10m ./...
+      go test -failfast -race -count=1 -timeout=10m \
+        $(go list ./... | grep -vE '/internal/(routes|tasks)$')
+      CGO_ENABLED=0 go test -failfast -count=1 -timeout=10m ./internal/routes ./internal/tasks
