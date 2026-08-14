@@ -1,9 +1,15 @@
 # hanzoai/notify — the multi-channel notification library/service (Go).
 #
-# Gate only, no `images:`. The image and the GitHub release are already cut by
-# .github/workflows/release.yml (semantic-release + goreleaser) from a tag;
-# declaring a second producer here would put two lanes behind one artifact name
-# and neither would be authoritative.
+# The image is declared here now. It used to be release.yml's, and release.yml
+# could not build it: half its matrix asked for `hanzoai-arm64`, a label no
+# runner in this fleet advertises, so the arm64 leg never dispatched and the
+# manifest-merge job that needed both arches never ran. It also cached through
+# `type=gha`, which the forge's token cannot satisfy. Its last run was cancelled
+# and there is no image behind any tag of this repo.
+#
+# amd64 only, because that is what the fleet is. The Dockerfile is already
+# TARGETARCH-parameterised, so restoring arm64 is a `platforms:` line here the
+# day a runner answers for it — not a second workflow.
 #
 # This is the repo's `make test` inlined — build the whole tree, then the suite
 # with -failfast -race. Written out rather than shelling to make because
@@ -25,6 +31,12 @@
 # reach — which is where the fan-out lives — and the two Base-backed packages
 # with CGO_ENABLED=0, exactly how the Dockerfile builds the shipping binary.
 # No build tag: a tagged cgo SQLite would be a third build that nothing ships.
+images:
+  - name: notify
+    context: .
+    dockerfile: Dockerfile
+    repo: ghcr.io/hanzoai/notify
+
 test:
   - name: build-and-test
     run: |
