@@ -52,7 +52,11 @@ RUN --mount=type=secret,id=github_token,target=/run/secrets/github_token \
 
 COPY . .
 
-ARG VERSION=dev
+# REVISION is what hanzoai/ci passes every build (--build-arg REVISION=$GITHUB_SHA);
+# VERSION defaults to it so a binary can always name the commit it came from.
+# Left at the literal "dev", every image ever published would answer `dev`.
+ARG REVISION=unknown
+ARG VERSION=${REVISION}
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 
