@@ -28,15 +28,9 @@ ENV GOSUMDB=off
 RUN groupadd -g 65532 nonroot && \
     useradd  -u 65532 -g 65532 -M -s /usr/sbin/nologin nonroot
 
-# Cache the module graph first. No credential: every module in this graph is
-# served by the public proxy and recorded in the public checksum log, measured
-# across the whole graph, so this is a proxy fetch verified against go.sum.
-#
-# GOPRIVATE above is what made a credential necessary — it means "bypass the
-# proxy AND the checksum database", and bypassing the proxy is what sent the
-# fetch to github.com needing authentication. The secret was described as
-# mount-only, but `git config --global` wrote it to /root/.gitconfig inside this
-# layer, where it shipped with the image.
+# Cache the module graph first. Every module in this graph is public, measured
+# across the whole graph, so the direct fetch above needs no credential and
+# go.sum pins the exact bytes of every dependency.
 COPY go.mod go.sum ./
 RUN go mod download
 
