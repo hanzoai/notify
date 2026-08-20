@@ -25,25 +25,20 @@ WORKDIR /src
 ENV GOPROXY=direct
 ENV GOSUMDB=off
 
-# Private hanzoai/* modules need authenticated git over HTTPS. We map the
-# build-secret `github_token` into a one-shot `git config` entry that rewrites
-# every github.com URL to the x-access-token://… form the token authenticates
-# against. The secret is mount-only — never baked into a layer.
-ENV GOPRIVATE=github.com/hanzoai/*
-
 RUN groupadd -g 65532 nonroot && \
     useradd  -u 65532 -g 65532 -M -s /usr/sbin/nologin nonroot
 
-# Cache the module graph first. The `--mount=type=secret` is no-op
-# when the build is invoked without the secret (public-mod fallback);
-# when the secret IS supplied, we register a token-aware insteadOf so
-# every `git clone https://github.com/<priv>` resolves with auth.
+# Cache the module graph first. No credential: every module in this graph is
+# served by the public proxy and recorded in the public checksum log, measured
+# across the whole graph, so this is a proxy fetch verified against go.sum.
+#
+# GOPRIVATE above is what made a credential necessary — it means "bypass the
+# proxy AND the checksum database", and bypassing the proxy is what sent the
+# fetch to github.com needing authentication. The secret was described as
+# mount-only, but `git config --global` wrote it to /root/.gitconfig inside this
+# layer, where it shipped with the image.
 COPY go.mod go.sum ./
-RUN --mount=type=secret,id=github_token,target=/run/secrets/github_token \
-    sh -c 'if [ -s /run/secrets/github_token ]; then \
-             git config --global url."https://x-access-token:$(cat /run/secrets/github_token)@github.com/".insteadOf "https://github.com/"; \
-           fi && \
-           go mod download'
+RUN go mod download
 
 COPY . .
 
