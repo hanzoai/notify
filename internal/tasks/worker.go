@@ -96,7 +96,7 @@ func (w *Worker) Start() error {
 		return nil
 	}
 	cli, err := client.Dial(client.Options{
-		HostPort:  w.cfg.Address,
+		Address:   w.cfg.Address,
 		Namespace: w.cfg.Namespace,
 	})
 	if err != nil {

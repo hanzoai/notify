@@ -25,34 +25,22 @@ WORKDIR /src
 ENV GOPROXY=direct
 ENV GOSUMDB=off
 
-# Private hanzoai/* + luxfi/* modules need authenticated git over HTTPS.
-# We map the build-secret `github_token` into a one-shot `git config`
-# entry that rewrites every github.com URL to x-access-token://… form
-# the token authenticates against. The secret is mount-only — never
-# baked into a layer.
-# `github.com//*` was here — an empty org between the slashes. No module path
-# can ever match it, so it selected nothing and silently did nothing; it reads
-# like a third private org is covered when none is. Almost certainly a
-# find-replace that deleted an org name and left the delimiters.
-ENV GOPRIVATE=github.com/hanzoai/*,github.com/lux-private/*
-
 RUN groupadd -g 65532 nonroot && \
     useradd  -u 65532 -g 65532 -M -s /usr/sbin/nologin nonroot
 
-# Cache the module graph first. The `--mount=type=secret` is no-op
-# when the build is invoked without the secret (public-mod fallback);
-# when the secret IS supplied, we register a token-aware insteadOf so
-# every `git clone https://github.com/<priv>` resolves with auth.
+# Cache the module graph first. Every module in this graph is public, measured
+# across the whole graph, so the direct fetch above needs no credential and
+# go.sum pins the exact bytes of every dependency.
 COPY go.mod go.sum ./
-RUN --mount=type=secret,id=github_token,target=/run/secrets/github_token \
-    sh -c 'if [ -s /run/secrets/github_token ]; then \
-             git config --global url."https://x-access-token:$(cat /run/secrets/github_token)@github.com/".insteadOf "https://github.com/"; \
-           fi && \
-           go mod download'
+RUN go mod download
 
 COPY . .
 
-ARG VERSION=dev
+# REVISION is what hanzoai/ci passes every build (--build-arg REVISION=$GITHUB_SHA);
+# VERSION defaults to it so a binary can always name the commit it came from.
+# Left at the literal "dev", every image ever published would answer `dev`.
+ARG REVISION=unknown
+ARG VERSION=${REVISION}
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 

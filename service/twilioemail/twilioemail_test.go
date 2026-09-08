@@ -14,6 +14,12 @@ import (
 
 // captured holds what the fake Twilio Emails endpoint received so the
 // test can assert URL, auth, and JSON body without a real send.
+//
+// `body` is the RAW decoded JSON, never `emailRequest`. Decoding into the
+// struct that encoded it makes every field name agree with itself by
+// construction, so the one thing a wire format can get wrong is the one
+// thing such a test cannot see. This suite was green throughout the life
+// of a body Twilio does not read.
 type captured struct {
 	method      string
 	path        string
@@ -21,7 +27,22 @@ type captured struct {
 	authUser    string
 	authPass    string
 	authOK      bool
-	body        emailRequest
+	body        map[string]any
+}
+
+// at walks the decoded body by key path, e.g. at(t, got.body, "content",
+// "html"), failing with the path it could not follow — which is what a
+// renamed field looks like from out here.
+func at(t *testing.T, body map[string]any, path ...string) any {
+	t.Helper()
+	var cur any = body
+	for i, key := range path {
+		obj, ok := cur.(map[string]any)
+		require.Truef(t, ok, "%v is not an object", path[:i])
+		cur, ok = obj[key]
+		require.Truef(t, ok, "request body has no %v", path[:i+1])
+	}
+	return cur
 }
 
 // newFakeTwilio returns an httptest server standing in for
@@ -69,15 +90,24 @@ func TestService_Send_BuildsCorrectRequest(t *testing.T) {
 	assert.Equal(t, "fake_token", got.authPass)
 
 	// JSON body shape.
-	assert.Equal(t, "no-reply@send.hanzo.ai", got.body.From.Address)
-	assert.Equal(t, "Hanzo", got.body.From.Name)
-	assert.Equal(t, "Welcome", got.body.Content.Subject)
-	require.Len(t, got.body.To, 2)
-	assert.Equal(t, "alice@example.com", got.body.To[0].Address)
-	assert.Equal(t, "bob@example.com", got.body.To[1].Address)
+	assert.Equal(t, "no-reply@send.hanzo.ai", at(t, got.body, "from", "address"))
+	assert.Equal(t, "Hanzo", at(t, got.body, "from", "name"))
+	assert.Equal(t, "Welcome", at(t, got.body, "content", "subject"))
+
+	to, ok := at(t, got.body, "to").([]any)
+	require.True(t, ok, "to must be an array")
+	require.Len(t, to, 2)
+	assert.Equal(t, "alice@example.com", to[0].(map[string]any)["address"])
+	assert.Equal(t, "bob@example.com", to[1].(map[string]any)["address"])
 	// Default body type is HTML.
-	assert.Equal(t, "<b>hello</b>", got.body.Content.HTML)
-	assert.Empty(t, got.body.Content.Text)
+	assert.Equal(t, "<b>hello</b>", at(t, got.body, "content", "html"))
+	assert.NotContains(t, at(t, got.body, "content"), "text")
+
+	// Nothing rides at the top level but the envelope. A `subject` or an
+	// `html` here is the flat shape coming back.
+	for _, key := range []string{"subject", "html", "text", "email"} {
+		assert.NotContains(t, got.body, key)
+	}
 }
 
 func TestService_Send_PlainText(t *testing.T) {
@@ -93,12 +123,12 @@ func TestService_Send_PlainText(t *testing.T) {
 
 	require.NoError(t, s.Send(context.Background(), "Subject", "plain body"))
 
-	assert.Equal(t, "plain body", got.body.Content.Text)
+	assert.Equal(t, "plain body", at(t, got.body, "content", "text"))
 	// Twilio requires a non-empty html part; plain text rides as an
 	// HTML-escaped <pre> copy.
-	assert.Equal(t, "<pre>plain body</pre>", got.body.Content.HTML)
+	assert.Equal(t, "<pre>plain body</pre>", at(t, got.body, "content", "html"))
 	// Empty sender name falls back to the sender address.
-	assert.Equal(t, "no-reply@send.hanzo.ai", got.body.From.Name)
+	assert.Equal(t, "no-reply@send.hanzo.ai", at(t, got.body, "from", "name"))
 }
 
 func TestService_Send_Non2xxIsError(t *testing.T) {
@@ -145,9 +175,11 @@ func TestService_SendWithHeaders_CarriesRFC8058(t *testing.T) {
 	}
 	require.NoError(t, s.SendWithHeaders(context.Background(), "Promo", "<b>deal</b>", headers))
 
-	require.Len(t, got.body.Content.Headers, 2)
-	assert.Equal(t, "<https://hanzo.ai/u/abc>, <mailto:unsub@hanzo.ai>", got.body.Content.Headers["List-Unsubscribe"])
-	assert.Equal(t, "List-Unsubscribe=One-Click", got.body.Content.Headers["List-Unsubscribe-Post"])
+	sent, ok := at(t, got.body, "content", "headers").(map[string]any)
+	require.True(t, ok, "headers must be an object")
+	require.Len(t, sent, 2)
+	assert.Equal(t, "<https://hanzo.ai/u/abc>, <mailto:unsub@hanzo.ai>", sent["List-Unsubscribe"])
+	assert.Equal(t, "List-Unsubscribe=One-Click", sent["List-Unsubscribe-Post"])
 }
 
 // TestService_Send_OmitsHeaders proves the plain Send path produces no
@@ -163,5 +195,5 @@ func TestService_Send_OmitsHeaders(t *testing.T) {
 	s.AddReceivers("alice@example.com")
 
 	require.NoError(t, s.Send(context.Background(), "Subject", "body"))
-	assert.Empty(t, got.body.Content.Headers)
+	assert.NotContains(t, at(t, got.body, "content"), "headers")
 }
