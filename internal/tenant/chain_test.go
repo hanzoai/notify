@@ -20,13 +20,13 @@ type fakeProvider struct {
 	id    string
 	err   error
 	delay time.Duration
-	calls int32
+	calls atomic.Int32
 }
 
 func (p *fakeProvider) ID() string { return p.id }
 
 func (p *fakeProvider) Send(ctx context.Context, subject, body, to string) error {
-	atomic.AddInt32(&p.calls, 1)
+	p.calls.Add(1)
 	if p.delay > 0 {
 		select {
 		case <-time.After(p.delay):
@@ -60,10 +60,10 @@ func TestRun_PrimaryWins(t *testing.T) {
 	if res.Winner != "plivo" {
 		t.Errorf("Winner = %q, want plivo", res.Winner)
 	}
-	if got := atomic.LoadInt32(&primary.calls); got != 1 {
+	if got := primary.calls.Load(); got != 1 {
 		t.Errorf("primary calls = %d, want 1", got)
 	}
-	if got := atomic.LoadInt32(&fallback.calls); got != 0 {
+	if got := fallback.calls.Load(); got != 0 {
 		t.Errorf("fallback calls = %d, want 0 (primary won, no fallback)", got)
 	}
 	if len(res.Attempts) != 1 {
@@ -103,10 +103,10 @@ func TestRun_PrimaryFails_FallbackWins(t *testing.T) {
 	if res.Winner != "twilio" {
 		t.Errorf("Winner = %q, want twilio", res.Winner)
 	}
-	if got := atomic.LoadInt32(&primary.calls); got != 1 {
+	if got := primary.calls.Load(); got != 1 {
 		t.Errorf("primary calls = %d, want 1 (must have been tried)", got)
 	}
-	if got := atomic.LoadInt32(&fallback.calls); got != 1 {
+	if got := fallback.calls.Load(); got != 1 {
 		t.Errorf("fallback calls = %d, want 1", got)
 	}
 	if len(res.Attempts) != 2 {
@@ -158,10 +158,10 @@ func TestRun_BothFail(t *testing.T) {
 	if len(res.Attempts) != 2 {
 		t.Fatalf("Attempts = %d, want 2 (every provider was tried)", len(res.Attempts))
 	}
-	if got := atomic.LoadInt32(&primary.calls); got != 1 {
+	if got := primary.calls.Load(); got != 1 {
 		t.Errorf("primary calls = %d, want 1", got)
 	}
-	if got := atomic.LoadInt32(&fallback.calls); got != 1 {
+	if got := fallback.calls.Load(); got != 1 {
 		t.Errorf("fallback calls = %d, want 1", got)
 	}
 }
@@ -197,10 +197,10 @@ func TestRun_TerminalRejection_NoFallback(t *testing.T) {
 	if res.Winner != "" {
 		t.Errorf("Winner = %q, want empty on terminal rejection", res.Winner)
 	}
-	if got := atomic.LoadInt32(&primary.calls); got != 1 {
+	if got := primary.calls.Load(); got != 1 {
 		t.Errorf("primary calls = %d, want 1", got)
 	}
-	if got := atomic.LoadInt32(&fallback.calls); got != 0 {
+	if got := fallback.calls.Load(); got != 0 {
 		t.Errorf("fallback calls = %d, want 0 (terminal — no retry)", got)
 	}
 	if len(res.Attempts) != 1 {
@@ -261,7 +261,7 @@ func TestRun_ParentContextCanceled(t *testing.T) {
 	// At least one attempt was logged with the cancellation reason; we
 	// do not require zero attempts because the chain's outer ctx is
 	// derived from the parent inside Run.
-	if atomic.LoadInt32(&primary.calls)+atomic.LoadInt32(&fallback.calls) > 1 {
+	if primary.calls.Load()+fallback.calls.Load() > 1 {
 		t.Errorf("multiple providers called on canceled context — must short-circuit after first")
 	}
 }
@@ -442,19 +442,17 @@ func TestRun_ConcurrentSafe(t *testing.T) {
 
 	var wg sync.WaitGroup
 	const goroutines = 50
-	for i := 0; i < goroutines; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range goroutines {
+		wg.Go(func() {
 			_, err := chain.Run(context.Background(), "+15555550100", "subj", "body")
 			if err != nil {
 				t.Errorf("concurrent Run failed: %v", err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 
-	if got := atomic.LoadInt32(&primary.calls); got != goroutines {
+	if got := primary.calls.Load(); got != goroutines {
 		t.Errorf("primary.calls = %d, want %d (every goroutine reached primary)", got, goroutines)
 	}
 }

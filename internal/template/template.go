@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 	texttemplate "text/template"
 
 	"github.com/hanzoai/base"
@@ -140,10 +141,5 @@ func validTransition(from, to string) bool {
 		schema.TemplateStatusPublished:       {schema.TemplateStatusArchived},
 		schema.TemplateStatusArchived:        {schema.TemplateStatusDraft},
 	}
-	for _, ok := range allowed[from] {
-		if ok == to {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowed[from], to)
 }

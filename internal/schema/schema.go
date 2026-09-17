@@ -21,7 +21,6 @@ package schema
 import (
 	"github.com/hanzoai/base"
 	"github.com/hanzoai/base/core"
-	"github.com/hanzoai/base/tools/types"
 )
 
 // Collection names. Hard-coded; this is the contract between the
@@ -35,9 +34,9 @@ const (
 	Meter     = "meter"
 
 	// Phase 1 collections from the notification-preferences paper.
-	Preferences        = "notification_preferences"
-	ConsentLog         = "notification_consent_log"
-	UnsubscribeTokens  = "notification_unsubscribe_tokens"
+	Preferences       = "notification_preferences"
+	ConsentLog        = "notification_consent_log"
+	UnsubscribeTokens = "notification_unsubscribe_tokens"
 )
 
 // ConsentLog event values stored in notification_consent_log.event.
@@ -134,8 +133,8 @@ func ensureTenants(app core.App) error {
 	c.Fields.Add(&core.TextField{Name: "name", Required: true, Max: 200})
 	c.Fields.Add(&core.AutodateField{Name: "created", OnCreate: true})
 	c.Fields.Add(&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true})
-	c.ListRule = types.Pointer("@request.auth.id != ''")
-	c.ViewRule = types.Pointer("@request.auth.id != ''")
+	c.ListRule = new("@request.auth.id != ''")
+	c.ViewRule = new("@request.auth.id != ''")
 	return app.Save(c)
 }
 

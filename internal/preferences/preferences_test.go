@@ -19,7 +19,6 @@ func TestValidateRequiredEmails(t *testing.T) {
 		{"bad backup", func(w *Wire) { w.BackupEmail = "@@" }, "backup_email"},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			w := goodWire()

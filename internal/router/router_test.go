@@ -1,6 +1,7 @@
 package router
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -113,7 +114,6 @@ func TestChannelMatrixCoverage(t *testing.T) {
 func TestMatrixAllows(t *testing.T) {
 	t.Parallel()
 	for _, tc := range matrix {
-		tc := tc
 		t.Run(string(tc.cat)+"_"+string(tc.ch)+"_"+tc.behavior, func(t *testing.T) {
 			t.Parallel()
 			got := matrixAllows(tc.cat, tc.ch)
@@ -166,7 +166,6 @@ func TestDeliveryChannels_FullyOptedIn(t *testing.T) {
 	prefs := fullyOptedInPrefs()
 
 	for _, tc := range matrix {
-		tc := tc
 		// We assert from the per-channel point of view: was this
 		// channel returned? It should be iff the matrix allows AND the
 		// channel is Phase 1 AND (transactional OR user opted in).
@@ -429,10 +428,5 @@ func TestInQuietHours(t *testing.T) {
 
 // has is a small slice membership probe used in the tests.
 func has(xs []Channel, x Channel) bool {
-	for _, e := range xs {
-		if e == x {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(xs, x)
 }

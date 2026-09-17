@@ -14,6 +14,7 @@
 package router
 
 import (
+	"slices"
 	"strings"
 	"time"
 )
@@ -52,7 +53,7 @@ type Channel string
 const (
 	ChEmail Channel = "email"
 	ChSMS   Channel = "sms"
-	ChWA    Channel = "wa"   // Phase 2 — never returned by Phase 1 router
+	ChWA    Channel = "wa" // Phase 2 — never returned by Phase 1 router
 	ChWeb   Channel = "web"
 	ChPush  Channel = "push" // Phase 3 — never returned by Phase 1 router
 )
@@ -387,10 +388,8 @@ func dedupe(xs []Channel) []Channel {
 // appendUnique keeps the result slice unique without re-allocating a
 // map on every call (the result set is small — at most 5 channels).
 func appendUnique(xs []Channel, x Channel) []Channel {
-	for _, e := range xs {
-		if e == x {
-			return xs
-		}
+	if slices.Contains(xs, x) {
+		return xs
 	}
 	return append(xs, x)
 }

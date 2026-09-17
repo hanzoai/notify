@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/hanzoai/base"
 	"github.com/hanzoai/base/apis"
@@ -120,12 +121,7 @@ func hasRole(e *core.RequestEvent, want string) bool {
 		return false
 	}
 	// Tiny linear scan; X-Roles is rarely more than a handful of entries.
-	for _, role := range splitCSV(roles) {
-		if role == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(splitCSV(roles), want)
 }
 
 func splitCSV(s string) []string {

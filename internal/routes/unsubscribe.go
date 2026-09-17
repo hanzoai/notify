@@ -20,6 +20,7 @@ package routes
 import (
 	"fmt"
 	"html"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -194,9 +195,7 @@ func markTokenConsumed(app core.App, token string, payload unsubscribe.Payload, 
 // the consent log doesn't alias the post-update map.
 func cloneSubs(m map[string]bool) map[string]bool {
 	out := make(map[string]bool, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
+	maps.Copy(out, m)
 	return out
 }
 

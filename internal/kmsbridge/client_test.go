@@ -97,24 +97,24 @@ func TestGetSecret_FlatValueShape(t *testing.T) {
 
 // TestGetSecret_Cache asserts hot reads do not redial KMS.
 func TestGetSecret_Cache(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"access_token":"jwt","expires_in":3600}`))
 	}))
 	defer iam.Close()
 	kms := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		_, _ = w.Write([]byte(`{"value":"cached"}`))
 	}))
 	defer kms.Close()
 
 	c, _ := New(Config{KMSEndpoint: kms.URL, IAMEndpoint: iam.URL, ClientID: "x", ClientSecret: "y"})
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if _, err := c.GetSecret("org", "p/n"); err != nil {
 			t.Fatalf("get %d: %v", i, err)
 		}
 	}
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("kms hits: got %d, want 1 (cache miss + 4 cache hits)", got)
 	}
 }
@@ -172,13 +172,13 @@ func TestDeleteSecret_404IsSuccess(t *testing.T) {
 
 // TestInvalidateCache drops cached values so the next read redials.
 func TestInvalidateCache(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"access_token":"jwt","expires_in":3600}`))
 	}))
 	defer iam.Close()
 	kms := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		_, _ = w.Write([]byte(`{"value":"v"}`))
 	}))
 	defer kms.Close()
@@ -186,16 +186,16 @@ func TestInvalidateCache(t *testing.T) {
 	_, _ = c.GetSecret("org", "p/n")
 	c.InvalidateCache("org")
 	_, _ = c.GetSecret("org", "p/n")
-	if got := atomic.LoadInt32(&hits); got != 2 {
+	if got := hits.Load(); got != 2 {
 		t.Errorf("kms hits: got %d, want 2 (no cache after invalidate)", got)
 	}
 }
 
 // TestStaticBearer skips IAM exchange when the override is set.
 func TestStaticBearer(t *testing.T) {
-	var iamCalls int32
+	var iamCalls atomic.Int32
 	iam := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&iamCalls, 1)
+		iamCalls.Add(1)
 	}))
 	defer iam.Close()
 
@@ -213,7 +213,7 @@ func TestStaticBearer(t *testing.T) {
 	if _, err := c.GetSecret("org", "p/n"); err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if got := atomic.LoadInt32(&iamCalls); got != 0 {
+	if got := iamCalls.Load(); got != 0 {
 		t.Errorf("iam calls: got %d, want 0 (StaticBearer suppresses exchange)", got)
 	}
 	if got := gotAuth.Load().(string); got != "Bearer fixed-token" {
@@ -266,9 +266,9 @@ func TestNew_Validation(t *testing.T) {
 // fresh IAM call. We feed a 1-second token, sleep past it, then expect
 // a second IAM call.
 func TestTokenRefresh_OnExpiry(t *testing.T) {
-	var iamCalls int32
+	var iamCalls atomic.Int32
 	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&iamCalls, 1)
+		iamCalls.Add(1)
 		// Below the 60s skew → bridge treats as already-near-expiry,
 		// refreshing on every call.
 		_, _ = w.Write([]byte(`{"access_token":"jwt","expires_in":1}`))
@@ -287,7 +287,7 @@ func TestTokenRefresh_OnExpiry(t *testing.T) {
 	if _, err := c.GetSecret("org", "p/n2"); err != nil {
 		t.Fatalf("get2: %v", err)
 	}
-	if got := atomic.LoadInt32(&iamCalls); got != 2 {
+	if got := iamCalls.Load(); got != 2 {
 		t.Errorf("iam calls: got %d, want 2 (expires_in=1 forces refresh on every read)", got)
 	}
 }
@@ -337,9 +337,9 @@ func TestNormalizeEndpoint(t *testing.T) {
 // to the HTTP secrets API end-to-end: a secret read lands on the HTTP mock
 // despite the zap:// scheme in config.
 func TestNew_NormalizesZapEndpoint(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	kms := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		if r.URL.Path != "/v1/kms/orgs/hanzo/secrets/brand/hanzo/twilio/auth-token" {
 			t.Errorf("path = %q, want canonical secrets route", r.URL.Path)
 		}
@@ -364,7 +364,7 @@ func TestNew_NormalizesZapEndpoint(t *testing.T) {
 	if val != "TW-TOKEN" {
 		t.Errorf("value = %q, want TW-TOKEN", val)
 	}
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("kms hits = %d, want 1", got)
 	}
 }

@@ -413,8 +413,8 @@ func clientIP(e *core.RequestEvent) string {
 	}
 	if xf := e.Request.Header.Get("X-Forwarded-For"); xf != "" {
 		// First entry is the originating client.
-		if i := strings.Index(xf, ","); i >= 0 {
-			return strings.TrimSpace(xf[:i])
+		if before, _, ok := strings.Cut(xf, ","); ok {
+			return strings.TrimSpace(before)
 		}
 		return strings.TrimSpace(xf)
 	}
