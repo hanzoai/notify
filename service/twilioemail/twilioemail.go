@@ -41,6 +41,7 @@ type Service struct {
 	senderName    string
 
 	usePlainText      bool
+	alternative       string
 	receiverAddresses []string
 
 	// baseURL is the Twilio Emails endpoint. Overridable in tests so the
@@ -120,6 +121,13 @@ func (s *Service) BodyFormat(format BodyType) {
 	}
 }
 
+// Alternative sets the plain-text part sent beside an HTML body (content.text),
+// so a client that shows no HTML reads the same message. A plain-text body is
+// already that part, and carries its own escaped HTML copy.
+func (s *Service) Alternative(text string) {
+	s.alternative = text
+}
+
 // Send POSTs the message to Twilio's Emails endpoint, addressed to every
 // previously-added recipient. subject + message become the email subject
 // and body; the body is sent as HTML unless BodyFormat(PlainText) was set.
@@ -149,6 +157,7 @@ func (s *Service) send(ctx context.Context, subject, message string, headers map
 		content.HTML = "<pre>" + html.EscapeString(message) + "</pre>"
 	} else {
 		content.HTML = message
+		content.Text = s.alternative
 	}
 	if len(headers) > 0 {
 		content.Headers = headers

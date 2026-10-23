@@ -12,6 +12,7 @@ import (
 // Mail struct holds necessary data to send emails.
 type Mail struct {
 	usePlainText      bool
+	alternative       string
 	senderAddress     string
 	smtpHostAddr      string
 	smtpAuth          smtp.Auth
@@ -66,6 +67,13 @@ func (m *Mail) BodyFormat(format BodyType) {
 	}
 }
 
+// Alternative sets the plain-text part sent beside an HTML body, so a client that
+// shows no HTML reads the same message (multipart/alternative, RFC 2046 §5.1.4).
+// A plain-text body is already that part, and is sent alone.
+func (m *Mail) Alternative(text string) {
+	m.alternative = text
+}
+
 func (m *Mail) newEmail(subject, message string) *email.Email {
 	msg := &email.Email{
 		To:      m.receiverAddresses,
@@ -78,6 +86,9 @@ func (m *Mail) newEmail(subject, message string) *email.Email {
 		msg.Text = []byte(message)
 	} else {
 		msg.HTML = []byte(message)
+		if m.alternative != "" {
+			msg.Text = []byte(m.alternative)
+		}
 	}
 	return msg
 }

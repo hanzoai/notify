@@ -31,6 +31,25 @@ func TestMail_newEmailText(t *testing.T) {
 	assert.Equal(t, []byte(nil), email.HTML)
 }
 
+// An HTML body carries its plain-text part beside it; a plain-text body is that
+// part already, and the alternative adds nothing to it.
+func TestMail_newEmailAlternative(t *testing.T) {
+	t.Parallel()
+
+	m := New("foo", "server")
+	m.Alternative("Sign in: https://example.com")
+	email := m.newEmail("test", "<p>Sign in</p>")
+	assert.Equal(t, []byte("<p>Sign in</p>"), email.HTML)
+	assert.Equal(t, []byte("Sign in: https://example.com"), email.Text)
+
+	plain := New("foo", "server")
+	plain.BodyFormat(PlainText)
+	plain.Alternative("ignored")
+	email = plain.newEmail("test", "plain body")
+	assert.Equal(t, []byte("plain body"), email.Text)
+	assert.Equal(t, []byte(nil), email.HTML)
+}
+
 func TestMail_AddReceivers(t *testing.T) {
 	t.Parallel()
 
