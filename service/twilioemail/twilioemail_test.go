@@ -131,6 +131,24 @@ func TestService_Send_PlainText(t *testing.T) {
 	assert.Equal(t, "no-reply@send.hanzo.ai", at(t, got.body, "from", "name"))
 }
 
+// An HTML body carries its plain-text part beside it, in content.text.
+func TestService_Send_Alternative(t *testing.T) {
+	t.Parallel()
+
+	srv, got := newFakeTwilio(t, http.StatusAccepted)
+
+	s := New("AC_fake_sid", "fake_token", "no-reply@send.hanzo.ai", "Hanzo")
+	s.baseURL = srv.URL + "/v1/Emails"
+	s.client = srv.Client()
+	s.Alternative("Sign in: https://hanzo.ai/auth/callback")
+	s.AddReceivers("alice@example.com")
+
+	require.NoError(t, s.Send(context.Background(), "Your sign-in link", "<p>Sign in</p>"))
+
+	assert.Equal(t, "<p>Sign in</p>", at(t, got.body, "content", "html"))
+	assert.Equal(t, "Sign in: https://hanzo.ai/auth/callback", at(t, got.body, "content", "text"))
+}
+
 func TestService_Send_Non2xxIsError(t *testing.T) {
 	t.Parallel()
 
